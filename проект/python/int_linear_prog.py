@@ -50,10 +50,14 @@ def linear_programming():
 
     problem.solve()
 
+
     print("Status:", pulp.LpStatus[problem.status])
     for v in problem.variables():
         print(v.name, "=", v.varValue)
     print("Total Cost =", pulp.value(problem.objective))
+    print(problem.solutionTime, 'секунд')
+    problem.writeLP('Lp')
+    problem.writeMPS('Mps')
 
 
 def main():
