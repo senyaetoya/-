@@ -1,12 +1,10 @@
 from pulp import *
-import numpy as np
 import xlrd
 from sympy import *
 
-
 def get_values(worksheet, row, column, string=False):
     values = []
-    while worksheet.cell(row, column).value != xlrd.empty_cell.value:
+    while row < worksheet.nrows and worksheet.cell(row, column).value != xlrd.empty_cell.value:
         if string:
             values.append(str(worksheet.cell(row, column).value))
         else:
@@ -15,18 +13,17 @@ def get_values(worksheet, row, column, string=False):
     return values
 
 
-def linear_programming():
-
-    workbook = xlrd.open_workbook('Zadachka.xlsx')
+def linear_programming(filepath, **coeffs):
+    workbook = xlrd.open_workbook(str(filepath))
     worksheet = workbook.sheet_by_index(0)
-    alpha = get_values(worksheet, 4, 1)
-    beta = get_values(worksheet, 4, 2)
-    v = get_values(worksheet, 4, 3)
-    V = get_values(worksheet, 4, 4)
-    teta = get_values(worksheet, 4, 5, string=True)
+    alpha = get_values(worksheet, 1, 1)
+    beta = get_values(worksheet, 1, 2)
+    v = get_values(worksheet, 1, 3)
+    V = get_values(worksheet, 1, 4)
+    teta = get_values(worksheet, 1, 5, string=True)
     assert len(teta) == len(v) == len(V) == len(alpha) == len(beta)
-    F = worksheet.cell(0, 1).value
-    T = worksheet.cell(1, 1).value
+    F = float(coeffs['F'])
+    T = int(coeffs['T'])
     k = [a/b for a, b in zip(V, v)]
     n = len(alpha)
     x = Symbol('x')
@@ -50,18 +47,21 @@ def linear_programming():
 
     problem.solve()
 
-
-    print("Status:", pulp.LpStatus[problem.status])
+    xs = []
     for v in problem.variables():
-        print(v.name, "=", v.varValue)
-    print("Total Cost =", pulp.value(problem.objective))
-    print(problem.solutionTime, 'секунд')
+        xs.append(str(v.name) + " = " + str(v.varValue))
+    status = 'Статус: ' + pulp.LpStatus[problem.status]
+    solution = 'Значение целевой функции: ' + str(pulp.value(problem.objective))
+    time = 'Время решения: ' + str(problem.solutionTime) + ' сек.'
+    results = [status, solution, *xs, time]
     problem.writeLP('Lp')
     problem.writeMPS('Mps')
 
+    return results
 
-def main():
-    print(linear_programming())
+
+def main(filepath, **coeffs):
+    return linear_programming(filepath, **coeffs)
 
 
 if __name__ == '__main__':
