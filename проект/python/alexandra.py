@@ -15,9 +15,11 @@ except ImportError:
     from tkinter import filedialog
 try:
     import ttk
+
     py3 = False
 except ImportError:
     import tkinter.ttk as ttk
+
     py3 = True
 
 from проект.python import alexandra_support
@@ -110,8 +112,8 @@ class Toplevel1:
         PNOTEBOOK = "ClosetabNotebook"
 
         '''tk variables'''
-        self.sort_var = tk.BooleanVar()
-        self.sort_var.set(0)
+        self.sort_var = tk.StringVar()
+        self.sort_var.set('β/α (max -> min)')
         #  кнопки открытия файла и запуска расчетов
         filename = tk.StringVar()
         filepath = tk.StringVar()
@@ -131,12 +133,12 @@ class Toplevel1:
         self.PNotebook1.configure(style=PNOTEBOOK)
         self.PNotebook1_t0 = tk.Frame(self.PNotebook1, takefocus='1')
         self.PNotebook1.add(self.PNotebook1_t0, padding=3)
-        self.PNotebook1.tab(0, text="Page 1", compound="none", underline="-1", )
+        self.PNotebook1.tab(0, text="Задача 1", compound="none", underline="-1", )
         self.PNotebook1_t0.configure(background="#ffffff")
         self.PNotebook1_t0.configure(highlightbackground="#d8d8d8")
         self.PNotebook1_t1 = tk.Frame(self.PNotebook1)
         self.PNotebook1.add(self.PNotebook1_t1, padding=3)
-        self.PNotebook1.tab(1, text="Page 2", compound="none", underline="-1", )
+        self.PNotebook1.tab(1, text="Задача 2", compound="none", underline="-1", )
 
         self.TLabel2 = ttk.Label(self.PNotebook1_t0)
         self.TLabel2.place(relx=0.038, rely=0.032, height=239, width=720)
@@ -172,47 +174,52 @@ class Toplevel1:
         self.Label6.configure(font="-family {DejaVu Sans} -size 16")
         self.Label6.configure(text='''F =''')
 
-        self.ba_sort_radio_p1 = tk.Radiobutton(self.PNotebook1_t0, variable=self.sort_var, value=0)
-        self.ba_sort_radio_p1.place(relx=0.05, rely=0.543, relheight=0.037
+        self.radio_sort_ba_p1 = tk.Radiobutton(self.PNotebook1_t0)
+        self.radio_sort_ba_p1.place(relx=0.05, rely=0.543, relheight=0.037
                                     , relwidth=0.182)
-        self.ba_sort_radio_p1.configure(justify='left')
-        self.ba_sort_radio_p1.configure(text='β/α (max -> min)')
+        self.radio_sort_ba_p1.configure(justify='left')
+        self.radio_sort_ba_p1.configure(text='β/α (max -> min)')
+        self.radio_sort_ba_p1.configure(variable=self.sort_var, value='β/α (max -> min)')
 
-        self.teta_sort_radio_p1 = tk.Radiobutton(self.PNotebook1_t0, variable=self.sort_var, value=1)
-        self.teta_sort_radio_p1.place(relx=0.05, rely=0.591, relheight=0.037
+        self.radio_sort_teta_p1 = tk.Radiobutton(self.PNotebook1_t0)
+        self.radio_sort_teta_p1.place(relx=0.05, rely=0.591, relheight=0.037
                                       , relwidth=0.252)
-        self.teta_sort_radio_p1.configure(justify='left')
-        self.teta_sort_radio_p1.configure(text='интеграл θ (max -> min)')
+        self.radio_sort_teta_p1.configure(justify='left')
+        self.radio_sort_teta_p1.configure(text='интеграл θ (max -> min)')
+        self.radio_sort_teta_p1.configure(variable=self.sort_var, value='интеграл θ (max -> min)')
 
         self.Label1 = tk.Label(self.PNotebook1_t0)
-        self.Label1.place(relx=0.05, rely=0.479, height=21, width=161)
+        self.Label1.place(relx=0.05, rely=0.479, height=21, width=180)
         self.Label1.configure(activebackground="#f9f9f9")
         self.Label1.configure(text='''Выберите сортировку:''')
 
         self.Label2 = tk.Label(self.PNotebook1_t0)
-        self.Label2.place(relx=0.388, rely=0.479, height=21, width=179)
+        self.Label2.place(relx=0.375, rely=0.479, height=21, width=195)
         self.Label2.configure(activebackground="#f9f9f9")
         self.Label2.configure(text='''Введите коэффициенты:''')
 
         self.Label3 = tk.Label(self.PNotebook1_t0)
-        self.Label3.place(relx=0.702, rely=0.479, height=21, width=185)
-        self.Label3.configure(text='''Выберите файл xlsx/xls:''')
-
+        self.Label3.place(relx=0.705, rely=0.479, height=21, width=185)
+        self.Label3.configure(text='''Выберите файл excel:''')
 
         def open_file():
-            file = filedialog.askopenfilename(filetypes=(('excel file', '*.xls'), ('excel file', '*.xlsx')))
+            file = filedialog.askopenfilename(filetypes=(('excel file', '*.xls'), ('excel file', '*.xlsx'),
+                                                         ('excel file', '*.xlsm')))
             if file is not None:
                 filename.set(file.rpartition('/')[2])
                 filepath.set(file)
 
         def call_linear_prog(filepath):
             if filepath == '':
-                print('Вы не выбрали файл')
+                messagebox.showinfo('Ошибка', 'Вы не выбрали файл')
             else:
                 T = self.T_entry_p1.get()
                 F = self.F_entry_p1.get()
-                results = integer_lp(filepath, T=T, F=F)
-                messagebox.showinfo('Решение', "\n".join(results))
+                if T == '' or F == '':
+                    messagebox.showinfo('Ошибка', 'Введены не все коэффициенты')
+                else:
+                    results = integer_lp(filepath, T=T, F=F, sort=self.sort_var.get())
+                    messagebox.showinfo('Решение', "\n".join(results))
 
         self.file_button_p1 = tk.Button(self.PNotebook1_t0, command=open_file)
         self.file_button_p1.place(relx=0.702, rely=0.543, height=41, width=191)
@@ -221,8 +228,8 @@ class Toplevel1:
         self.file_button_p1.configure(relief='sunken', textvariable=filename)
 
         self.exe_button_p1 = ttk.Button(self.PNotebook1_t0)
-        self.exe_button_p1.configure(command = lambda: call_linear_prog(filepath.get()))
-        self.exe_button_p1.place(relx=0.388, rely=0.815, height=58, width=170)
+        self.exe_button_p1.configure(command=lambda: call_linear_prog(filepath.get()))
+        self.exe_button_p1.place(relx=0.330, rely=0.790, height=70, width=250)
         self.exe_button_p1.configure(text='''Рассчитать''')
 
         self.PNotebook1.bind('<Button-1>', _button_press)
