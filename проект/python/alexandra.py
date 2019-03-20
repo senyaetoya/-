@@ -21,7 +21,7 @@ except ImportError:
     py3 = True
 
 from проект.python import alexandra_support
-from проект.python import int_linear_prog
+from проект.python.int_linear_prog import integer_lp
 from tkinter import messagebox
 import os.path
 
@@ -56,7 +56,7 @@ def create_Toplevel1(root, *args, **kwargs):
     w = tk.Toplevel(root)
     top = Toplevel1(w)
     alexandra_support.init(w, top, *args, **kwargs)
-    return (w, top)
+    return w, top
 
 
 def destroy_Toplevel1():
@@ -69,11 +69,11 @@ class Toplevel1:
     def __init__(self, top=None):
         '''This class configures and populates the toplevel window.
            top is the toplevel containing window.'''
-        _bgcolor = '#d9d9d9'  # X11 color: 'gray85'
+        _bgcolor = '#ffffff'  # X11 color: 'gray85'
         _fgcolor = '#000000'  # X11 color: 'black'
         _compcolor = '#d9d9d9'  # X11 color: 'gray85'
-        _ana1color = '#d9d9d9'  # X11 color: 'gray85'
-        _ana2color = '#ececec'  # Closest X11 color: 'gray92'
+        _ana1color = '#ffffff'  # X11 color: 'gray85'
+        _ana2color = '#ffffff'  # Closest X11 color: 'gray92'
 
         self.style = ttk.Style()
         if sys.platform == "win32":
@@ -85,34 +85,8 @@ class Toplevel1:
         [('selected', _compcolor), ('active', _ana2color)])
 
         top.geometry("800x652+611+181")
-        top.title("New Toplevel")
+        top.title("Задачи линейного программирования")
         top.configure(highlightcolor="black")
-
-        self.images = (
-
-            tk.PhotoImage("img_close", data='''R0lGODlhDAAMAIQUADIyMjc3Nzk5OT09PT
-                 8/P0JCQkVFRU1NTU5OTlFRUVZWVmBgYGF hYWlpaXt7e6CgoLm5ucLCwszMzNbW
-                 1v//////////////////////////////////// ///////////yH5BAEKAB8ALA
-                 AAAAAMAAwAAAUt4CeOZGmaA5mSyQCIwhCUSwEIxHHW+ fkxBgPiBDwshCWHQfc5
-                 KkoNUtRHpYYAADs= '''),
-
-            tk.PhotoImage("img_closeactive", data='''R0lGODlhDAAMAIQcALwuEtIzFL46
-                 INY0Fdk2FsQ8IdhAI9pAIttCJNlKLtpLL9pMMMNTP cVTPdpZQOBbQd60rN+1rf
-                 Czp+zLxPbMxPLX0vHY0/fY0/rm4vvx8Pvy8fzy8P//////// ///////yH5BAEK
-                 AB8ALAAAAAAMAAwAAAVHYLQQZEkukWKuxEgg1EPCcilx24NcHGYWFhx P0zANBE
-                 GOhhFYGSocTsax2imDOdNtiez9JszjpEg4EAaA5jlNUEASLFICEgIAOw== '''),
-
-            tk.PhotoImage("img_closepressed", data='''R0lGODlhDAAMAIQeAJ8nD64qELE
-                 rELMsEqIyG6cyG7U1HLY2HrY3HrhBKrlCK6pGM7lD LKtHM7pKNL5MNtiViNaon
-                 +GqoNSyq9WzrNyyqtuzq+O0que/t+bIwubJw+vJw+vTz+zT z////////yH5BAE
-                 KAB8ALAAAAAAMAAwAAAVJIMUMZEkylGKuwzgc0kPCcgl123NcHWYW Fs6Gp2mYB
-                 IRgR7MIrAwVDifjWO2WwZzpxkxyfKVCpImMGAeIgQDgVLMHikmCRUpMQgA7 ''')
-        )
-
-        self.style.element_create("close", "image", "img_close",
-                                  ("active", "pressed", "!disabled", "img_closepressed"),
-                                  ("active", "alternate", "!disabled",
-                                   "img_closeactive"), border=8, sticky='')
 
         self.style.layout("ClosetabNotebook", [("ClosetabNotebook.client",
                                                 {"sticky": "nswe"})])
@@ -136,8 +110,8 @@ class Toplevel1:
         PNOTEBOOK = "ClosetabNotebook"
 
         '''tk variables'''
-        sort_var = tk.BooleanVar()
-        sort_var.set(0)
+        self.sort_var = tk.BooleanVar()
+        self.sort_var.set(0)
         #  кнопки открытия файла и запуска расчетов
         filename = tk.StringVar()
         filepath = tk.StringVar()
@@ -198,13 +172,13 @@ class Toplevel1:
         self.Label6.configure(font="-family {DejaVu Sans} -size 16")
         self.Label6.configure(text='''F =''')
 
-        self.ba_sort_radio_p1 = tk.Radiobutton(self.PNotebook1_t0, variable=sort_var, value=0)
+        self.ba_sort_radio_p1 = tk.Radiobutton(self.PNotebook1_t0, variable=self.sort_var, value=0)
         self.ba_sort_radio_p1.place(relx=0.05, rely=0.543, relheight=0.037
                                     , relwidth=0.182)
         self.ba_sort_radio_p1.configure(justify='left')
         self.ba_sort_radio_p1.configure(text='β/α (max -> min)')
 
-        self.teta_sort_radio_p1 = tk.Radiobutton(self.PNotebook1_t0, variable=sort_var, value=1)
+        self.teta_sort_radio_p1 = tk.Radiobutton(self.PNotebook1_t0, variable=self.sort_var, value=1)
         self.teta_sort_radio_p1.place(relx=0.05, rely=0.591, relheight=0.037
                                       , relwidth=0.252)
         self.teta_sort_radio_p1.configure(justify='left')
@@ -237,7 +211,7 @@ class Toplevel1:
             else:
                 T = self.T_entry_p1.get()
                 F = self.F_entry_p1.get()
-                results = int_linear_prog.main(filepath, T=T, F=F)
+                results = integer_lp(filepath, T=T, F=F)
                 messagebox.showinfo('Решение', "\n".join(results))
 
         self.file_button_p1 = tk.Button(self.PNotebook1_t0, command=open_file)
