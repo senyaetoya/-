@@ -116,7 +116,7 @@ def integer_lp(filepath, **coeffs):
 
 
 def main():
-    print(get_data('Zadachka.xlsx', T=30, F=100000))
+    print(integer_lp('Zadachka (копия).xlsx', T=30, F=100000, sort='β/α (max -> min)'))
 
 
 if __name__ == '__main__':
