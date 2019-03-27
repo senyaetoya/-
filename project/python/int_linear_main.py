@@ -6,12 +6,12 @@ from math import ceil, floor
 
 class Solved(object):
     def __init__(self, problem, number, func_value, vars_value,
-                 continuos_var=False, cont_var_value=False):
+                 continuos_var=None, cont_var_value=None):
         self.problem = problem
         self.number = number
         self.func_value = func_value
-        self.cont_var = continuos_var
         self.vars_value = vars_value
+        self.cont_var = continuos_var
         self.cont_var_value = cont_var_value
 
     def __repr__(self):
@@ -20,10 +20,11 @@ class Solved(object):
     def __str__(self):
         return self.value
 
-def get_values(worksheet, row, column, string=False):
+
+def get_values(worksheet, row, column, expression=False):
     values = []
     while worksheet.cell(row=row, column=column).value:
-        if string:
+        if expression:
             values.append(str(worksheet.cell(row, column).value))
         else:
             values.append(worksheet.cell(row, column).value)
@@ -40,7 +41,7 @@ def get_data(filepath, **coeffs):
     beta = get_values(worksheet, 2, 3)
     v = get_values(worksheet, 2, 4)
     V = get_values(worksheet, 2, 5)
-    teta = get_values(worksheet, 2, 6, string=True)
+    teta = get_values(worksheet, 2, 6, expression=True)
     k = [a / b for a, b in zip(V, v)]
     # убеждаемся, что массивы одинаковой длины
     assert len(teta) == len(v) == len(V) == len(alpha) == len(beta)
@@ -49,7 +50,8 @@ def get_data(filepath, **coeffs):
     F = float(coeffs['F'])
     sort_type = coeffs['sort']
     # интегрируем тета
-    teta_integrated = [float(integrate(eval(teta[i]), (Symbol('x'), 0, T))) for i in range(0, len(teta))]
+    x = Symbol('x')
+    teta_integrated = [float(integrate(eval(teta[i]), (x, 0, T))) for i in range(0, len(teta))]
     #  вызываем функцию-решатель
     return [alpha, beta, v, teta_integrated, k, F], sort_type, workbook, worksheet
 
@@ -170,7 +172,7 @@ def vetv(parent_problem, acc, queue, max_z, optimal, i):
                 child_solved.cont_var_value = v.varValue
                 break
 
-        if child_solved.cont_var is False and max_z == 0:  # шаг 5
+        if child_solved.cont_var is None and max_z == 0:  # шаг 5
             max_z = child_solved.func_value
             optimal.append(child_solved)
             for prob in queue:  # проверяем, будем ли ветвить эту задачу
@@ -178,10 +180,10 @@ def vetv(parent_problem, acc, queue, max_z, optimal, i):
                     queue.append(child_solved)
                     break
 
-        elif child_solved.cont_var is False and child_solved.value >= max_z:
+        elif child_solved.cont_var is None and child_solved.func_value >= max_z:
             optimal.append(child_solved)
 
-        elif child_solved.cont_var is True and max_z == 0:
+        elif child_solved.cont_var is not None and max_z == 0:
             queue.append(child_solved)
 
     if i == 1:

@@ -3,10 +3,10 @@ import openpyxl
 from sympy import *
 
 
-def get_values(worksheet, row, column, string=False):
+def get_values(worksheet, row, column, expression=False):
     values = []
     while worksheet.cell(row=row, column=column).value:
-        if string:
+        if expression:
             values.append(str(worksheet.cell(row, column).value))
         else:
             values.append(worksheet.cell(row, column).value)
@@ -23,7 +23,7 @@ def get_data(filepath, **coeffs):
     beta = get_values(worksheet, 2, 3)
     v = get_values(worksheet, 2, 4)
     V = get_values(worksheet, 2, 5)
-    teta = get_values(worksheet, 2, 6, string=True)
+    teta = get_values(worksheet, 2, 6, expression=True)
     k = [a / b for a, b in zip(V, v)]
     # убеждаемся, что массивы одинаковой длины
     assert len(teta) == len(v) == len(V) == len(alpha) == len(beta)
@@ -32,7 +32,8 @@ def get_data(filepath, **coeffs):
     F = float(coeffs['F'])
     sort_type = coeffs['sort']
     # интегрируем тета
-    teta_integrated = [float(integrate(eval(teta[i]), (Symbol('x'), 0, T))) for i in range(0, len(teta))]
+    x = Symbol('x')
+    teta_integrated = [float(integrate(eval(teta[i]), (x, 0, T))) for i in range(0, len(teta))]
     #  вызываем функцию-решатель
     return [alpha, beta, v, teta_integrated, k, F], sort_type, workbook, worksheet
 
@@ -117,7 +118,8 @@ def integer_lp(filepath, **coeffs):
 
 
 def main():
-    print(integer_lp('Zadachka.xlsx', T=30, F=100000, sort='β/α (max -> min)'))
+    answer = integer_lp('Zadachka.xlsx', T=30, F=100000, sort='β/α (max -> min)')
+    print(*answer, sep="\n")
 
 
 if __name__ == '__main__':

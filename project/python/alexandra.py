@@ -22,8 +22,9 @@ except ImportError:
 
     py3 = True
 
+'''импорты мои'''
 from project.python import alexandra_support
-from project.python.int_linear_only_lib import integer_lp
+from project.python.int_linear_main import integer_lp
 from tkinter import messagebox
 import os.path
 
@@ -255,7 +256,7 @@ def _button_release(event):
     element = widget.identify(event.x, event.y)
     try:
         index = widget.index("@%d,%d" % (event.x, event.y))
-    except TclError:
+    except tk.TclError:
         pass
     if "close" in element and widget._active == index:
         widget.forget(index)
