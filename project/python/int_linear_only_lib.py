@@ -38,26 +38,27 @@ def get_data(filepath, **coeffs):
 
 
 def sort_data(alpha, beta, v, teta_integrated, k, F, sort_type):
-    print(teta_integrated)
-    print(alpha)
-    print(beta)
-    print(k)
-    print(v)
+    print(teta_integrated, 'teta')
+    print(alpha, 'alpha')
+    print(beta, 'beta')
+    print(k, 'k')
+    print(v, 'v')
     if sort_type == 'β/α (max -> min)':
         ba = [b / a for a, b in zip(alpha, beta)]
+        print(ba, 'b/a')
         zipped = list(zip(ba, teta_integrated, alpha, beta, k, v))
         zipped.sort(reverse=True)
         ba, teta_integrated, alpha, beta, k, v = zip(*zipped)
-        print(ba)
+        print(ba, 'b/a')
     else:
         zipped = list(zip(teta_integrated, alpha, beta, k, v))
         zipped.sort(reverse=True)
         teta_integrated, alpha, beta, k, v = zip(*zipped)
-    print(teta_integrated)
-    print(alpha)
-    print(beta)
-    print(k)
-    print(v)
+    print(teta_integrated, 'teta')
+    print(alpha, 'alpha')
+    print(beta, 'beta')
+    print(k, 'k')
+    print(v, 'v')
     return [alpha, beta, v, teta_integrated, k, F]
 
 
@@ -116,7 +117,7 @@ def integer_lp(filepath, **coeffs):
 
 
 def main():
-    print(integer_lp('Zadachka (копия).xlsx', T=30, F=100000, sort='β/α (max -> min)'))
+    print(integer_lp('Zadachka.xlsx', T=30, F=100000, sort='β/α (max -> min)'))
 
 
 if __name__ == '__main__':

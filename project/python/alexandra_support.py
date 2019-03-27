@@ -37,6 +37,6 @@ def destroy_window():
 
 
 if __name__ == '__main__':
-    from проект.python import alexandra
+    from project.python import alexandra
 
     alexandra.vp_start_gui()

@@ -22,8 +22,8 @@ except ImportError:
 
     py3 = True
 
-from проект.python import alexandra_support
-from проект.python.int_linear_prog import integer_lp
+from project.python import alexandra_support
+from project.python.int_linear_only_lib import integer_lp
 from tkinter import messagebox
 import os.path
 
