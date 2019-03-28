@@ -90,24 +90,6 @@ def form_problem(alpha, beta, v, teta_integrated, k, F):
     return problem
 
 
-def copy_problem(problem, acc):  # бросил, делаю через var_values в классе Solved
-    copy = LpProblem(acc, LpMaximize)
-    n = len(problem.variables())
-    y = LpVariable.dicts('y', range(n), lowBound=0, cat=LpContinuous)
-    print(problem.constraints)
-    for key in problem.constraints:
-        coeffs = []
-        constr = problem.constraints[key]
-        constant = constr.constant
-        for var in constr:
-            coeffs.append(constr[var])
-
-    copy.solve()
-    print('kek')
-
-    return problem
-
-
 def solve_problem(problem):
     queue = []  # очередь на ветвление
     optimal = []  # лист оптимальных целочисленных решений
@@ -128,6 +110,8 @@ def solve_problem(problem):
                 status, acc, solution = branch_and_bound(queue, max_z, acc, optimal)  # шаг 3
                 return [status, solution.problem.variables(), solution.func_value, solution.vars_value,
                         solution.number, acc]
+            else:
+                return ['Оптимально', problem_copy.variables(), pulp.value(problem_copy.objective), acc]
                 # возвращаем проблему, если она целочислена, в главную функцию
 
 
