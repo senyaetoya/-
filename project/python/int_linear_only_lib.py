@@ -1,6 +1,8 @@
+# -*- coding: utf-8 -*-
+
+from openpyxl import load_workbook
 from pulp import *
-import openpyxl
-from sympy import *
+from sympy import integrate, Symbol
 
 
 def get_values(worksheet, row, column, expression=False):
@@ -14,9 +16,9 @@ def get_values(worksheet, row, column, expression=False):
     return values
 
 
-def get_data(filepath, **coeffs):
+def get_data_excel(filepath, T):
     #  открываем нужный лист в выбранной в форме книге excel
-    workbook = openpyxl.load_workbook(filename=str(filepath))
+    workbook = load_workbook(filename=str(filepath))
     worksheet = workbook.worksheets[0]
     #  получаем массивы данных с листа по столбцам
     alpha = get_values(worksheet, 2, 2)
@@ -27,73 +29,92 @@ def get_data(filepath, **coeffs):
     k = [a / b for a, b in zip(V, v)]
     # убеждаемся, что массивы одинаковой длины
     assert len(teta) == len(v) == len(V) == len(alpha) == len(beta)
-    #  приводим в нужный формат коэффициенты с формы
-    T = int(coeffs['T'])
-    F = float(coeffs['F'])
-    sort_type = coeffs['sort']
     # интегрируем тета
     x = Symbol('x')
     teta_integrated = [float(integrate(eval(teta[i]), (x, 0, T))) for i in range(0, len(teta))]
     #  вызываем функцию-решатель
-    return [alpha, beta, v, teta_integrated, k, F], sort_type, workbook, worksheet
+    return [alpha, beta, v, teta_integrated, k], workbook, worksheet
 
 
-def sort_data(alpha, beta, v, teta_integrated, k, F, sort_type):
-    print(teta_integrated, 'teta')
-    print(alpha, 'alpha')
-    print(beta, 'beta')
-    print(k, 'k')
-    print(v, 'v')
-    if sort_type == 'β/α (max -> min)':
+def sort_data(sort_type, alpha, beta, v, teta_integrated, k):
+    if sort_type == 'b/a':
         ba = [b / a for a, b in zip(alpha, beta)]
-        print(ba, 'b/a')
         zipped = list(zip(ba, teta_integrated, alpha, beta, k, v))
         zipped.sort(reverse=True)
         ba, teta_integrated, alpha, beta, k, v = zip(*zipped)
-        print(ba, 'b/a')
-    else:
+    elif sort_type == 'teta':
         zipped = list(zip(teta_integrated, alpha, beta, k, v))
         zipped.sort(reverse=True)
         teta_integrated, alpha, beta, k, v = zip(*zipped)
-    print(teta_integrated, 'teta')
-    print(alpha, 'alpha')
-    print(beta, 'beta')
-    print(k, 'k')
-    print(v, 'v')
-    return [alpha, beta, v, teta_integrated, k, F]
+    return [alpha, beta, v, teta_integrated, k]
 
 
-def solve_problem(alpha, beta, v, teta_integrated, k, F):
-    n = len(alpha)
-    problem = LpProblem('Zadachka', LpMaximize)
-    x = LpVariable.dicts('x', range(n), lowBound=0, cat=LpInteger)
-    sum_var1 = lpSum([x[i] * v[i] * beta[i] for i in range(0, n)])
-    sum_var2 = lpSum([x[i] * v[i] * alpha[i] for i in range(0, n)])
-    problem += sum_var1 - sum_var2  # 'Функция цели "11.1"'
-    problem += sum_var2 <= F  # "11.2"
-    constraint1 = [x[i] <= k[i] for i in range(0, n)]
-    for cnstr in constraint1:
-        problem += cnstr
-    constraint2 = [x[i] * v[i] <= teta_integrated[i] for i in range(0, n)]
-    for cnstr in constraint2:
-        problem += cnstr
-    constraint3 = [teta_integrated[i] <= v[i] * (x[i] + 1) for i in range(0, n)]
-    for cnstr in constraint3:
-        problem += cnstr
-    problem.solve()
-    return [problem.variables(), pulp.LpStatus[problem.status], \
-            pulp.value(problem.objective), problem.solutionTime]
+def solve_problem(alpha, beta, v, teta_integrated, k, **coeffs):
+
+    def solve_problem_1(alpha, beta, v, teta_integrated, k, F):
+        n = len(alpha)
+        problem = LpProblem('Zadachka', LpMaximize)
+        x = LpVariable.dicts('x', range(n), lowBound=0, cat=LpInteger)
+        sum_xvb = lpSum([x[i] * v[i] * beta[i] for i in range(0, n)])
+        sum_xva = lpSum([x[i] * v[i] * alpha[i] for i in range(0, n)])
+        problem += sum_xvb - sum_xva  # 'Функция цели "11.1"'
+        problem += sum_xva <= F  # "11.2"
+        constraint1 = [x[i] <= k[i] for i in range(0, n)]
+        for cnstr in constraint1:
+            problem += cnstr
+        constraint2 = [x[i] * v[i] <= teta_integrated[i] for i in range(0, n)]
+        for cnstr in constraint2:
+            problem += cnstr
+        constraint3 = [teta_integrated[i] <= v[i] * (x[i] + 1) for i in range(0, n)]
+        for cnstr in constraint3:
+            problem += cnstr
+
+        problem.solve()
+        return [problem.variables(), pulp.LpStatus[problem.status],
+                pulp.value(problem.objective), problem.solutionTime]
+
+    def solve_problem_2(alpha, beta, v, teta_integrated, k, F, D, y):
+        n = len(alpha)
+        problem = LpProblem('Zadachka', LpMaximize)
+        x = LpVariable.dicts('x', range(n), lowBound=0, cat=LpInteger)
+        sum_xvb = lpSum([x[i] * v[i] * beta[i] for i in range(0, n)])
+        sum_xva = lpSum([x[i] * v[i] * alpha[i] for i in range(0, n)])
+        sum_1yax = lpSum([(1 + y) * alpha[i] * x[i] for i in range(0, n)])
+        sum_bx = lpSum([beta[i] * x[i] for i in range(0, n)])
+
+        problem += sum_xvb + ((1 + y) * (F - sum_xva))
+
+        problem += sum_xva <= F + D
+        constraint1 = [x[i] <= k[i] for i in range(0, n)]
+        for cnstr in constraint1:
+            problem += cnstr
+        constraint2 = [x[i] * v[i] <= teta_integrated[i] for i in range(0, n)]
+        for cnstr in constraint2:
+            problem += cnstr
+        constraint3 = [teta_integrated[i] <= v[i] * (x[i] + 1) for i in range(0, n)]
+        for cnstr in constraint3:
+            problem += cnstr
+        problem += sum_1yax <= sum_bx
+
+        problem.solve()
+        problem.writeLP('kek')
+        return [problem.variables(), pulp.LpStatus[problem.status],
+                pulp.value(problem.objective), problem.solutionTime]
+
+    if coeffs['zadacha'] == 1:
+        return solve_problem_1(alpha, beta, v, teta_integrated, k,  coeffs['F'])
+    elif coeffs['zadacha'] == 2:
+        return solve_problem_2(alpha, beta, v, teta_integrated, k, coeffs['F'], coeffs['D'], coeffs['y'])
 
 
-def show_results(variables, status, solution, time, sort_type):
-    xs = []
-    for v in variables:
-        xs.append(str(v.name) + " = " + str(v.varValue))
+def show_results(sort_type, variables, status, solution, time):
     status = 'Статус: ' + status
     solution = 'Значение целевой функции: ' + str(solution)
     time = 'Время решения: ' + str(time) + ' сек.'
     sort_type = 'Сортировка: ' + sort_type
-    results = [status, sort_type, solution, *xs, time]
+    results = [status, sort_type, solution, time]
+    for v in variables:
+        results.append(str(v.name) + " = " + str(v.varValue))
     return results
 
 
@@ -110,16 +131,16 @@ def write_to_excel(workbook, worksheet, filepath, sort_type, *problem):
 
 
 def integer_lp(filepath, **coeffs):
-    data, sort_type, workbook, worksheet = get_data(filepath, **coeffs)
-    sorted_data = sort_data(*data, sort_type)
-    problem = solve_problem(*sorted_data)
-    write_to_excel(workbook, worksheet, filepath, sort_type, *problem)
-    return show_results(*problem, sort_type)
+    data, workbook, worksheet = get_data_excel(filepath, coeffs['T'])
+    sorted_data = sort_data(coeffs['sort'], *data)
+    problem = solve_problem(*sorted_data, **coeffs)
+    write_to_excel(workbook, worksheet, filepath, coeffs['sort'], *problem)
+    return show_results(coeffs['sort'], *problem)
 
 
 def main():
-    answer = integer_lp('Zadachka.xlsx', T=30, F=100000, sort='β/α (max -> min)')
-    print(*answer, sep="\n")
+    print(integer_lp('Zadachka2.xlsx', T=1, F=30000, D=6000, y=0.125, zadacha=2, sort='β/α (max -> min)'))
+    print(integer_lp('Zadachka.xlsx', T=30, F=100000, zadacha=1, sort='β/α (max -> min)'))
 
 
 if __name__ == '__main__':
