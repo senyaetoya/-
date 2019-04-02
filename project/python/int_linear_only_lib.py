@@ -70,11 +70,13 @@ def solve_problem(alpha, beta, v, teta_integrated, k, **coeffs):
             problem += cnstr
 
         problem.solve()
+        problem.writeLP('formula1')
         return [problem.variables(), pulp.LpStatus[problem.status],
                 pulp.value(problem.objective), problem.solutionTime]
 
     def solve_problem_2(alpha, beta, v, teta_integrated, k, F, D, y):
         n = len(alpha)
+        V = [v[i] * k[i] for i in range(0, n)]
         problem = LpProblem('Zadachka', LpMaximize)
         x = LpVariable.dicts('x', range(n), lowBound=0, cat=LpInteger)
         sum_xvb = lpSum([x[i] * v[i] * beta[i] for i in range(0, n)])
@@ -82,22 +84,18 @@ def solve_problem(alpha, beta, v, teta_integrated, k, **coeffs):
         sum_1yax = lpSum([(1 + y) * alpha[i] * x[i] for i in range(0, n)])
         sum_bx = lpSum([beta[i] * x[i] for i in range(0, n)])
 
-        problem += sum_xvb + ((1 + y) * (F - sum_xva))
+        problem += sum_xvb + ((1 + y) * (F - sum_xva))  # цель
 
         problem += sum_xva <= F + D
         constraint1 = [x[i] <= k[i] for i in range(0, n)]
-        for cnstr in constraint1:
-            problem += cnstr
-        constraint2 = [x[i] * v[i] <= teta_integrated[i] for i in range(0, n)]
-        for cnstr in constraint2:
-            problem += cnstr
-        constraint3 = [teta_integrated[i] <= v[i] * (x[i] + 1) for i in range(0, n)]
-        for cnstr in constraint3:
+        constraint2 = [x[i] * v[i] <= min(teta_integrated[i], V[i]) for i in range(0, n)]
+        constraint3 = [min(teta_integrated[i], V[i]) <= v[i] * (x[i] + 1) for i in range(0, n)]
+        for cnstr in [*constraint1, *constraint2, *constraint3]:
             problem += cnstr
         problem += sum_1yax <= sum_bx
 
         problem.solve()
-        problem.writeLP('kek')
+        problem.writeLP('formula2')
         return [problem.variables(), pulp.LpStatus[problem.status],
                 pulp.value(problem.objective), problem.solutionTime]
 
@@ -134,12 +132,12 @@ def integer_lp(filepath, **coeffs):
     data, workbook, worksheet = get_data_excel(filepath, coeffs['T'])
     sorted_data = sort_data(coeffs['sort'], *data)
     problem = solve_problem(*sorted_data, **coeffs)
-    write_to_excel(workbook, worksheet, filepath, coeffs['sort'], *problem)
+    #  write_to_excel(workbook, worksheet, filepath, coeffs['sort'], *problem)
     return show_results(coeffs['sort'], *problem)
 
 
 def main():
-    print(integer_lp('Zadachka2.xlsx', T=1, F=30000, D=6000, y=0.125, zadacha=2, sort='β/α (max -> min)'))
+    print(integer_lp('Zadachka2.xlsx', T=1, F=30000, D=12000, y=0.11, zadacha=2, sort='β/α (max -> min)'))
     print(integer_lp('Zadachka.xlsx', T=30, F=100000, zadacha=1, sort='β/α (max -> min)'))
 
 

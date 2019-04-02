@@ -1,7 +1,9 @@
+# -*- coding: utf-8 -*-
+
+from openpyxl import load_workbook
 from pulp import *
-import openpyxl
-from sympy import *
 from math import ceil, floor
+from sympy import Symbol, integrate
 
 
 class Solved(object):
@@ -37,9 +39,9 @@ def get_values(worksheet, row, column, expression=False):
     return values
 
 
-def get_data(filepath, **coeffs):
+def get_data_excel(filepath, T):
     #  открываем нужный лист в выбранной в форме книге excel
-    workbook = openpyxl.load_workbook(filename=str(filepath))
+    workbook = load_workbook(filename=str(filepath))
     worksheet = workbook.worksheets[0]
     #  получаем массивы данных с листа по столбцам
     alpha = get_values(worksheet, 2, 2)
@@ -50,48 +52,77 @@ def get_data(filepath, **coeffs):
     k = [a / b for a, b in zip(V, v)]
     # убеждаемся, что массивы одинаковой длины
     assert len(teta) == len(v) == len(V) == len(alpha) == len(beta)
-    #  приводим в нужный формат коэффициенты с формы
-    T = int(coeffs['T'])
-    F = float(coeffs['F'])
-    sort_type = coeffs['sort']
     # интегрируем тета
     x = Symbol('x')
     teta_integrated = [float(integrate(eval(teta[i]), (x, 0, T))) for i in range(0, len(teta))]
     #  вызываем функцию-решатель
-    return [alpha, beta, v, teta_integrated, k, F], sort_type, workbook, worksheet
+    return [alpha, beta, v, teta_integrated, k], workbook, worksheet
 
 
-def sort_data(alpha, beta, v, teta_integrated, k, F, sort_type):
+def sort_data(sort_type, alpha, beta, v, teta_integrated, k):
     if sort_type == 'b/a':
         ba = [b / a for a, b in zip(alpha, beta)]
         zipped = list(zip(ba, teta_integrated, alpha, beta, k, v))
         zipped.sort(reverse=True)
         ba, teta_integrated, alpha, beta, k, v = zip(*zipped)
-    else:
+    elif sort_type == 'teta':
         zipped = list(zip(teta_integrated, alpha, beta, k, v))
         zipped.sort(reverse=True)
         teta_integrated, alpha, beta, k, v = zip(*zipped)
-    return [alpha, beta, v, teta_integrated, k, F]
+    return [alpha, beta, v, teta_integrated, k]
 
 
-def form_problem(alpha, beta, v, teta_integrated, k, F):
-    n = len(alpha)
-    problem = LpProblem('Zadachka', LpMaximize)
-    x = LpVariable.dicts('x', range(n), lowBound=0, cat=LpContinuous)
-    sum_var1 = lpSum([x[i] * v[i] * beta[i] for i in range(0, n)])
-    sum_var2 = lpSum([x[i] * v[i] * alpha[i] for i in range(0, n)])
-    problem += sum_var1 - sum_var2  # 'Функция цели "11.1"'
-    problem += sum_var2 <= F  # "11.2"
-    constraint1 = [x[i] <= k[i] for i in range(0, n)]
-    for cnstr in constraint1:
-        problem += cnstr
-    constraint2 = [x[i] * v[i] <= teta_integrated[i] for i in range(0, n)]
-    for cnstr in constraint2:
-        problem += cnstr
-    constraint3 = [teta_integrated[i] <= v[i] * (x[i] + 1) for i in range(0, n)]
-    for cnstr in constraint3:
-        problem += cnstr
-    return problem
+def form_problem(alpha, beta, v, teta_integrated, k, **coeffs):
+
+    def form_problem_1(alpha, beta, v, teta_integrated, k, F):
+        n = len(alpha)
+        problem = LpProblem('Zadachka', LpMaximize)
+        x = LpVariable.dicts('x', range(n), lowBound=0, cat=LpContinuous)
+        sum_var1 = lpSum([x[i] * v[i] * beta[i] for i in range(0, n)])
+        sum_var2 = lpSum([x[i] * v[i] * alpha[i] for i in range(0, n)])
+
+        problem += sum_var1 - sum_var2  # 'Функция цели "11.1"'
+
+        problem += sum_var2 <= F  # "11.2"
+        constraint1 = [x[i] <= k[i] for i in range(0, n)]
+        for cnstr in constraint1:
+            problem += cnstr
+        constraint2 = [x[i] * v[i] <= teta_integrated[i] for i in range(0, n)]
+        for cnstr in constraint2:
+            problem += cnstr
+        constraint3 = [teta_integrated[i] <= v[i] * (x[i] + 1) for i in range(0, n)]
+        for cnstr in constraint3:
+            problem += cnstr
+        problem.writeLP('formula1')
+        return problem
+
+    def form_problem_2(alpha, beta, v, teta_integrated, k, F, D, y):
+        n = len(alpha)
+        V = [v[i] * k[i] for i in range(0, n)]
+        problem = LpProblem('Zadachka', LpMaximize)
+        x = LpVariable.dicts('x', range(n), lowBound=0, cat=LpContinuous)
+        sum_xvb = lpSum([x[i] * v[i] * beta[i] for i in range(0, n)])
+        sum_xva = lpSum([x[i] * v[i] * alpha[i] for i in range(0, n)])
+        sum_1yax = lpSum([(1 + y) * alpha[i] * x[i] for i in range(0, n)])
+        sum_bx = lpSum([beta[i] * x[i] for i in range(0, n)])
+
+        problem += sum_xvb + ((1 + y) * (F - sum_xva))  # цель
+
+        problem += sum_xva <= F + D
+        constraint1 = [x[i] <= k[i] for i in range(0, n)]
+        constraint2 = [x[i] * v[i] <= min(teta_integrated[i], V[i]) for i in range(0, n)]
+        constraint3 = [min(teta_integrated[i], V[i]) <= v[i] * (x[i] + 1) for i in range(0, n)]
+        for cnstr in [*constraint1, *constraint2, *constraint3]:
+            problem += cnstr
+        problem += sum_1yax <= sum_bx
+
+        problem.writeLP('formula2')
+        return problem
+
+    if coeffs['zadacha'] == 1:
+        return form_problem_1(alpha, beta, v, teta_integrated, k, coeffs['F'])
+    elif coeffs['zadacha'] == 2:
+        return form_problem_2(alpha, beta, v, teta_integrated, k, coeffs['F'], coeffs['D'], coeffs['y'])
 
 
 def solve_problem(problem):
@@ -100,7 +131,7 @@ def solve_problem(problem):
     acc = 1  # счетчик задач
     max_z = 0  # максимальное значение целевой функции
     problem_copy = problem.deepcopy()
-    problem_copy.solve() # решаем первую проблему
+    problem_copy.solve()  # решаем первую проблему
 
     # возвращаем задачу, если она не оптимальна
     if problem_copy.status != 1:
@@ -111,12 +142,16 @@ def solve_problem(problem):
             if v.varValue != int(v.varValue):
                 var_values = [var.varValue for var in problem_copy.variables()]
                 # добавляем первую проблему в очередь на ветвление
-                queue.append(Solved(problem, acc, pulp.value(problem_copy.objective),
-                                    var_values, v, v.varValue))
+                queue.append(Solved(problem=problem,
+                                    number=acc,
+                                    func_value=value(problem_copy.objective),
+                                    vars_value=var_values,
+                                    continuos_var=v,
+                                    cont_var_value=v.varValue))
                 status, acc, solution = branch_and_bound(queue, max_z, acc, optimal)
                 # возвращаем проблему после branch_and_bound
                 if solution:
-                    return Solution(variables=solution.variables,
+                    return Solution(variables=solution.problem.variables(),
                                     vars_value=solution.vars_value,
                                     func_value=solution.func_value,
                                     number=solution.number,
@@ -125,14 +160,13 @@ def solve_problem(problem):
                 # если нет решений
                 else:
                     return Solution(status=status, acc=acc)
-            # если проблема целочислена на первом шаге
-            else:
-                return Solution(variables=problem_copy.variables(),
-                                vars_value=[var.varValue for var in problem_copy.variables()],
-                                func_value=pulp.value(problem_copy.objective),
-                                number=acc,
-                                acc=acc,
-                                status='Оптимально')
+        # если проблема целочислена на первом шаге
+        return Solution(variables=problem_copy.variables(),
+                        vars_value=[var.varValue for var in problem_copy.variables()],
+                        func_value=pulp.value(problem_copy.objective),
+                        number=acc,
+                        acc=acc,
+                        status='Оптимально')
 
 
 def branch_and_bound(queue, max_z, acc, optimal):  # передаем сюда задачу на ветвление, в том числе нецелую переменную
@@ -196,29 +230,53 @@ def vetv(parent_problem, acc, queue, max_z, optimal, i):
         return queue, max_z, acc, optimal
 
 
-def show_results(solved, sort_type):
-    status = 'Статус: ' + solved.status
+def write_to_excel(workbook, worksheet, filepath, sort_type, problem):
+    for row in worksheet['H2:H9']:
+        for cell in row:
+            cell.value = None
+    if problem.variables is None:
+        worksheet.cell(2, 8).value = 'Статус: ' + problem.status
+        worksheet.cell(3, 8).value = 'Количество решенных ЗЛП: ' + str(problem.acc)
+    else:
+        worksheet.cell(2, 8).value = 'Статус: ' + problem.status
+        worksheet.cell(3, 8).value = 'Сортировка: ' + sort_type
+        worksheet.cell(4, 8).value = 'Значение целевой функции: ' + str(problem.func_value)
+        worksheet.cell(5, 8).value = 'Количество решенных ЗЛП: ' + str(problem.acc)
+        worksheet.cell(6, 8).value = 'Номер оптимальной задачи: ' + str(problem.number)
+        for i in range(len(problem.variables)):
+            worksheet.cell(6 + i, 8).value = (str(problem.variables[i]) +
+                                              " = " + str(problem.vars_value[i]))
+    workbook.save(filepath)
 
-    xs = [str(x[0]) + ' = ' + str(x[1]) for x in zip(solved.variables, solved.vars_value)]
-    number_of_optimal = 'Номер оптимальной задачи: ' + str(solved.number)
-    func_value = 'Значение целевой функции: ' + str(solved.func_value)
-    sort_type = 'Сортировка: ' + sort_type
-    acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
-    results = [status, func_value, *xs, sort_type, acc, number_of_optimal]
+
+def show_results(sort_type, solved):
+    if solved.variables is None:
+        status = 'Статус: ' + solved.status
+        acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
+        results = [status, acc]
+    else:
+        status = 'Статус: ' + solved.status
+        xs = [str(x[0]) + ' = ' + str(x[1]) for x in zip(solved.variables, solved.vars_value)]
+        number_of_optimal = 'Номер оптимальной задачи: ' + str(solved.number)
+        func_value = 'Значение целевой функции: ' + str(solved.func_value)
+        sort_type = 'Сортировка: ' + sort_type
+        acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
+        results = [status, func_value, *xs, sort_type, acc, number_of_optimal]
     return results
 
 
 def integer_lp(filepath, **coeffs):
-    data, sort_type, workbook, worksheet = get_data(filepath, **coeffs)
-    sorted_data = sort_data(*data, sort_type)
-    problem = form_problem(*sorted_data)
+    data, workbook, worksheet = get_data_excel(filepath, coeffs['T'])
+    sorted_data = sort_data(coeffs['sort'], *data)
+    problem = form_problem(*sorted_data, **coeffs)
     solved_problem = solve_problem(problem)
-    return show_results(solved_problem, sort_type)
+    write_to_excel(workbook, worksheet, filepath, coeffs['sort'], solved_problem)
+    return show_results(coeffs['sort'], solved_problem)
 
 
 def main():
-    answer = integer_lp('Zadachka.xlsx', T=30, F=100000, sort='b/a')
-    print(*answer, sep="\n")
+    print(integer_lp('Zadachka2.xlsx', T=1, F=30000, D=6000, y=0.125, zadacha=2, sort='b/a'))
+    print(integer_lp('Zadachka.xlsx', T=30, F=100000, zadacha=1, sort='b/a'))
 
 
 if __name__ == '__main__':

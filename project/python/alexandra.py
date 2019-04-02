@@ -5,7 +5,7 @@
 import sys
 
 from project.python import alexandra_support
-from project.python.int_linear_only_lib import integer_lp
+from project.python.int_linear_main import integer_lp
 
 try:
     import Tkinter as tk
