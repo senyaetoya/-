@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-
+from anytree import Node
+from anytree.exporter import DotExporter
 from openpyxl import load_workbook
 from pulp import *
 from math import ceil, floor
@@ -7,25 +8,34 @@ from sympy import Symbol, integrate
 
 
 class Solved(object):
-    def __init__(self, problem, number, func_value, vars_value,
-                 continuos_var=None, cont_var_value=None):
+    solved_list = []
+
+    def __init__(self, problem, number, func_value, vars_value, status,
+                 cont_var=None, cont_var_value=None):
         self.problem = problem
+        self.status = status
         self.number = number
         self.func_value = func_value
         self.vars_value = vars_value
-        self.cont_var = continuos_var
+        self.cont_var = cont_var
         self.cont_var_value = cont_var_value
+        self.__class__.solved_list.append(self)
+
+    def __repr__(self):
+        return str(self.number)
 
 
 class Solution(object):
-    def __init__(self, status, acc, func_value=None, number=None,
-                 variables=None, vars_value=None):
+    def __init__(self, status, acc, solution=None):
         self.status = status
-        self.variables = variables
-        self.func_value = func_value
-        self.vars_value = vars_value
-        self.number = number
         self.acc = acc
+        self.has_sol = False
+        if solution is not None:
+            self.has_sol = True
+            self.variables = solution.problem.variables()
+            self.func_value = solution.func_value
+            self.vars_value = solution.vars_value
+            self.number = solution.number
 
 
 def get_values(worksheet, row, column, expression=False):
@@ -56,25 +66,26 @@ def get_data_excel(filepath, T):
     x = Symbol('x')
     teta_integrated = [float(integrate(eval(teta[i]), (x, 0, T))) for i in range(0, len(teta))]
     #  вызываем функцию-решатель
-    return [alpha, beta, v, teta_integrated, k], workbook, worksheet
+    return [alpha, beta, v, teta_integrated, V], workbook, worksheet
 
 
-def sort_data(sort_type, alpha, beta, v, teta_integrated, k):
+def sort_data(sort_type, alpha, beta, v, teta_integrated, V):
     if sort_type == 'b/a':
         ba = [b / a for a, b in zip(alpha, beta)]
-        zipped = list(zip(ba, teta_integrated, alpha, beta, k, v))
+        zipped = list(zip(ba, teta_integrated, alpha, beta, V, v))
         zipped.sort(reverse=True)
-        ba, teta_integrated, alpha, beta, k, v = zip(*zipped)
+        ba, teta_integrated, alpha, beta, V, v = zip(*zipped)
     elif sort_type == 'teta':
-        zipped = list(zip(teta_integrated, alpha, beta, k, v))
+        zipped = list(zip(teta_integrated, alpha, beta, V, v))
         zipped.sort(reverse=True)
-        teta_integrated, alpha, beta, k, v = zip(*zipped)
-    return [alpha, beta, v, teta_integrated, k]
+        teta_integrated, alpha, beta, V, v = zip(*zipped)
+    return [alpha, beta, v, teta_integrated, V]
 
 
-def form_problem(alpha, beta, v, teta_integrated, k, **coeffs):
+def form_problem(alpha, beta, v, teta_integrated, V, **coeffs):
 
-    def form_problem_1(alpha, beta, v, teta_integrated, k, F):
+    def form_problem_1(alpha, beta, v, teta_integrated, V, F):
+        k = [a / b for a, b in zip(V, v)]
         n = len(alpha)
         problem = LpProblem('Zadachka', LpMaximize)
         x = LpVariable.dicts('x', range(n), lowBound=0, cat=LpContinuous)
@@ -96,7 +107,8 @@ def form_problem(alpha, beta, v, teta_integrated, k, **coeffs):
         problem.writeLP('formula1')
         return problem
 
-    def form_problem_2(alpha, beta, v, teta_integrated, k, F, D, y):
+    def form_problem_2(alpha, beta, v, teta_integrated, V, F, D, y):
+        k = [a / b for a, b in zip(V, v)]
         n = len(alpha)
         V = [v[i] * k[i] for i in range(0, n)]
         problem = LpProblem('Zadachka', LpMaximize)
@@ -120,53 +132,47 @@ def form_problem(alpha, beta, v, teta_integrated, k, **coeffs):
         return problem
 
     if coeffs['zadacha'] == 1:
-        return form_problem_1(alpha, beta, v, teta_integrated, k, coeffs['F'])
+        return form_problem_1(alpha, beta, v, teta_integrated, V, coeffs['F'])
     elif coeffs['zadacha'] == 2:
-        return form_problem_2(alpha, beta, v, teta_integrated, k, coeffs['F'], coeffs['D'], coeffs['y'])
+        return form_problem_2(alpha, beta, v, teta_integrated, V, coeffs['F'], coeffs['D'], coeffs['y'])
+
+
+def create_Solved(problem, acc):
+    problem_copy = problem.deepcopy()
+    problem_copy.solve()
+    acc += 1
+    # создаем объект решенной задачи
+    solved = Solved(problem=problem,
+                    status=problem_copy.status,
+                    number=acc,
+                    func_value=value(problem_copy.objective),
+                    vars_value=[var.varValue for var in problem_copy.variables()])
+    for v in problem_copy.variables():
+        if v.varValue != int(v.varValue):
+            solved.cont_var, solved.cont_var_value = v, v.varValue
+    return solved, acc
 
 
 def solve_problem(problem):
+    # обнуляем дерево, потому что в одном прогоне программы может решаться несколько задач
+    Solved.solved_list = []
     queue = []  # очередь на ветвление
     optimal = []  # лист оптимальных целочисленных решений
-    acc = 1  # счетчик задач
+    acc = 0  # счетчик задач
     max_z = 0  # максимальное значение целевой функции
-    problem_copy = problem.deepcopy()
-    problem_copy.solve()  # решаем первую проблему
-
+    first, acc = create_Solved(problem, acc)
     # возвращаем задачу, если она не оптимальна
-    if problem_copy.status != 1:
-        return Solution(status='Нерешаемо', acc=acc)
+    if first.status != 1:
+        return Solution(status='Нерешаемо', acc=acc, solution=None)
     else:
-        # проверяем все х на целочисленность
-        for v in problem_copy.variables():
-            if v.varValue != int(v.varValue):
-                var_values = [var.varValue for var in problem_copy.variables()]
-                # добавляем первую проблему в очередь на ветвление
-                queue.append(Solved(problem=problem,
-                                    number=acc,
-                                    func_value=value(problem_copy.objective),
-                                    vars_value=var_values,
-                                    continuos_var=v,
-                                    cont_var_value=v.varValue))
-                status, acc, solution = branch_and_bound(queue, max_z, acc, optimal)
-                # возвращаем проблему после branch_and_bound
-                if solution:
-                    return Solution(variables=solution.problem.variables(),
-                                    vars_value=solution.vars_value,
-                                    func_value=solution.func_value,
-                                    number=solution.number,
-                                    acc=acc,
-                                    status=status)
-                # если нет решений
-                else:
-                    return Solution(status=status, acc=acc)
+        # проверяем проблему на целочисленность
+        if first.cont_var is not None:
+            # добавляем первую проблему в очередь на ветвление
+            queue.append(first)
+            return branch_and_bound(queue, max_z, acc, optimal)
         # если проблема целочислена на первом шаге
-        return Solution(variables=problem_copy.variables(),
-                        vars_value=[var.varValue for var in problem_copy.variables()],
-                        func_value=pulp.value(problem_copy.objective),
-                        number=acc,
-                        acc=acc,
-                        status='Оптимально')
+        else:
+            return Solution(acc=acc, status='Оптимально', solution=first)
 
 
 def branch_and_bound(queue, max_z, acc, optimal):  # передаем сюда задачу на ветвление, в том числе нецелую переменную
@@ -177,7 +183,7 @@ def branch_and_bound(queue, max_z, acc, optimal):  # передаем сюда �
                 max_prob = prob
         queue.remove(max_prob)
         i = 1
-        queue, max_z, acc, optimal = vetv(max_prob, acc, queue, max_z, optimal, i)
+        queue, max_z, acc, optimal = create_branch(max_prob, acc, queue, max_z, optimal, i)
         return branch_and_bound(queue, max_z, acc, optimal)
     else:
         if optimal:
@@ -185,31 +191,19 @@ def branch_and_bound(queue, max_z, acc, optimal):  # передаем сюда �
             for prob in optimal[1:]:
                 if prob.func_value > solution.func_value:
                     solution = prob
-            return 'Оптимально', acc, solution   # возвращаем успешное решение в формате Solved
+            return Solution(acc=acc, status='Оптимально', solution=solution)  # возвращаем успешное решение в формате Solved
         else:
-            return 'Нерешаемо', acc, False  # тут тоже должен быть солюшн
+            return Solution(status='Нерешаемо', acc=acc, solution=None)  # тут тоже должен быть солюшн
 
 
-def vetv(parent_problem, acc, queue, max_z, optimal, i):
+def create_branch(parent_problem, acc, queue, max_z, optimal, i):
     child_problem = parent_problem.problem.deepcopy()
     if i == 1:
         child_problem += parent_problem.cont_var <= floor(parent_problem.cont_var_value)  # левая ветвь
-    if i == 2:
+    elif i == 2:
         child_problem += parent_problem.cont_var >= ceil(parent_problem.cont_var_value)  # правая ветвь
-    child_problem_copy = child_problem.deepcopy()
-    child_problem_copy.solve()
-    acc += 1
-
-    if child_problem_copy.status == 1:  # формируем подпроблему в очередь
-        var_values = [var.varValue for var in child_problem_copy.variables()]
-        child_solved = Solved(child_problem, acc, pulp.value(child_problem_copy.objective),
-                              var_values)
-        for v in child_problem_copy.variables():  # ищем нецелочисленную переменную
-            if v.varValue != int(v.varValue):
-                child_solved.cont_var = v
-                child_solved.cont_var_value = v.varValue
-                break
-
+    child_solved, acc = create_Solved(child_problem, acc)
+    if child_solved.status == 1:  # формируем подпроблему в очередь
         if child_solved.cont_var is None and max_z == 0:  # шаг 5
             max_z = child_solved.func_value
             optimal.append(child_solved)
@@ -225,8 +219,8 @@ def vetv(parent_problem, acc, queue, max_z, optimal, i):
             queue.append(child_solved)
 
     if i == 1:
-        return vetv(parent_problem, acc, queue, max_z, optimal, i + 1)  # ветвим второй раз
-    else:
+        return create_branch(parent_problem, acc, queue, max_z, optimal, i + 1)  # ветвим второй раз
+    elif i == 2:
         return queue, max_z, acc, optimal
 
 
@@ -234,7 +228,7 @@ def write_to_excel(workbook, worksheet, filepath, sort_type, problem):
     for row in worksheet['H2:H9']:
         for cell in row:
             cell.value = None
-    if problem.variables is None:
+    if not problem.has_sol:
         worksheet.cell(2, 8).value = 'Статус: ' + problem.status
         worksheet.cell(3, 8).value = 'Количество решенных ЗЛП: ' + str(problem.acc)
     else:
@@ -250,7 +244,7 @@ def write_to_excel(workbook, worksheet, filepath, sort_type, problem):
 
 
 def show_results(sort_type, solved):
-    if solved.variables is None:
+    if not solved.has_sol:
         status = 'Статус: ' + solved.status
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
         results = [status, acc]
@@ -262,6 +256,7 @@ def show_results(sort_type, solved):
         sort_type = 'Сортировка: ' + sort_type
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
         results = [status, func_value, *xs, sort_type, acc, number_of_optimal]
+    print(Solved.solved_list)
     return results
 
 

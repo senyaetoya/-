@@ -138,7 +138,7 @@ def integer_lp(filepath, **coeffs):
 
 def main():
     print(integer_lp('Zadachka2.xlsx', T=1, F=30000, D=12000, y=0.11, zadacha=2, sort='β/α (max -> min)'))
-    print(integer_lp('Zadachka.xlsx', T=30, F=100000, zadacha=1, sort='β/α (max -> min)'))
+    print(integer_lp('Zadachka.xlsx', T=1, F=30000, zadacha=1, sort='β/α (max -> min)'))
 
 
 if __name__ == '__main__':
