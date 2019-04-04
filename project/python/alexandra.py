@@ -142,13 +142,17 @@ class Toplevel1:
         filename = tk.StringVar()
         filepath = tk.StringVar()
         #  коэффициенты в entry
-        F = tk.DoubleVar()
-        T = tk.IntVar()
+        F1 = tk.DoubleVar()
+        F2 = tk.DoubleVar()
+        T1 = tk.IntVar()
+        T2 = tk.IntVar()
         D = tk.DoubleVar()
         y = tk.DoubleVar()
-        F.set(30000)
-        T.set(1)
-        D.set(0.4 * F.get())
+        F1.set(100000)
+        F2.set(30000)
+        T1.set(30)
+        T2.set(1)
+        D.set(0.4 * F2.get())
         y.set(0.125)
 
         self.style.configure('TNotebook.Tab', background=_bgcolor)
@@ -184,7 +188,7 @@ class Toplevel1:
         self.Label_F.configure(font="-family {DejaVu Sans} -size 16")
         self.Label_F.configure(text='''F =''')
 
-        self.F_entry_p1 = tk.Entry(self.PNotebook1_t0, textvariable=F)
+        self.F_entry_p1 = tk.Entry(self.PNotebook1_t0, textvariable=F1)
         self.F_entry_p1.place(relx=0.464, rely=0.51, height=43, relwidth=0.133)
         self.F_entry_p1.configure(background="white")
         self.F_entry_p1.configure(font="TkFixedFont")
@@ -196,7 +200,7 @@ class Toplevel1:
         self.Label_T.configure(font="-family {DejaVu Sans} -size 16")
         self.Label_T.configure(text='''T =''')
 
-        self.T_entry_p1 = tk.Entry(self.PNotebook1_t0, textvariable=T)
+        self.T_entry_p1 = tk.Entry(self.PNotebook1_t0, textvariable=T1)
         self.T_entry_p1.place(relx=0.464, rely=0.60, height=43, relwidth=0.133)
         self.T_entry_p1.configure(background="white")
         self.T_entry_p1.configure(font="TkFixedFont")
@@ -259,7 +263,7 @@ class Toplevel1:
         self.Label_F_p2.configure(font="-family {DejaVu Sans} -size 16")
         self.Label_F_p2.configure(text='''F =''')
 
-        self.F_entry_p2 = tk.Entry(self.PNotebook1_t1, textvariable=F)
+        self.F_entry_p2 = tk.Entry(self.PNotebook1_t1, textvariable=F2)
         self.F_entry_p2.place(relx=0.464, rely=0.51, height=33, relwidth=0.133)
         self.F_entry_p2.configure(background="white")
         self.F_entry_p2.configure(font="TkFixedFont")
@@ -271,7 +275,7 @@ class Toplevel1:
         self.Label_T_p2.configure(font="-family {DejaVu Sans} -size 16")
         self.Label_T_p2.configure(text='''T =''')
 
-        self.T_entry_p2 = tk.Entry(self.PNotebook1_t1, textvariable=T)
+        self.T_entry_p2 = tk.Entry(self.PNotebook1_t1, textvariable=T2)
         self.T_entry_p2.place(relx=0.464, rely=0.58, height=33, relwidth=0.133)
         self.T_entry_p2.configure(background="white")
         self.T_entry_p2.configure(font="TkFixedFont")

@@ -8,6 +8,8 @@ from sympy import Symbol, integrate
 
 
 class Solved(object):
+    # чтобы решить проблему с pyinstaller
+    solver = COIN_CMD(path=os.path.join(os.getcwd(), 'solver/cbc'))
     tree = []
     statuses = ['Не решено', 'Оптимально', 'Неопределенно', 'Не ограниченно', 'Нерешаемо']
 
@@ -55,7 +57,7 @@ class Solution(object):
 
 def create_Solved(problem, acc, parent_number=None):
     problem_copy = problem.deepcopy()
-    problem_copy.solve()
+    problem_copy.solve(Solved.solver)
     acc += 1
     # создаем объект решенной задачи
     solved = Solved(problem=problem,
@@ -272,7 +274,7 @@ def show_results(sort_type, solved):
         func_value = 'Значение целевой функции: ' + str(solved.func_value)
         sort_type = 'Сортировка: ' + sort_type
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
-        results = [status, func_value, *xs, sort_type, acc, number_of_optimal]
+        results = [status, func_value, *xs, sort_type, number_of_optimal, acc]
     DotExporter(Solved.tree[0], nodenamefunc=Solved.nodenamefunc).to_picture("results/ZLP_tree.png")
     return results
 
