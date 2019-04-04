@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from anytree import Node
+from anytree import Node, RenderTree
 from anytree.exporter import DotExporter
 from openpyxl import load_workbook
 from pulp import *
@@ -8,10 +8,24 @@ from sympy import Symbol, integrate
 
 
 class Solved(object):
-    solved_list = []
+    tree = []
+    statuses = ['Не решено', 'Оптимально', 'Неопределенно', 'Не ограниченно', 'Нерешаемо']
+
+    def nodenamefunc(node):
+        node_params = [str(node.name), node.status, *node.xs]
+        return "\n".join(node_params)
+
+    def make_node(self):
+        status = Solved.statuses[self.status]
+        xs = [str(x[0]) + ' = ' + str(x[1]) for x in zip(self.problem.variables(), self.vars_value)]
+        new_node = Node(name=self.number, status=status, xs=xs, parent_name=self.parent_number)
+        for node in self.tree:
+            if node.name == new_node.parent_name:
+                new_node.parent = node
+        self.tree.append(new_node)
 
     def __init__(self, problem, number, func_value, vars_value, status,
-                 cont_var=None, cont_var_value=None):
+                 cont_var=None, cont_var_value=None, parent_number=None):
         self.problem = problem
         self.status = status
         self.number = number
@@ -19,7 +33,8 @@ class Solved(object):
         self.vars_value = vars_value
         self.cont_var = cont_var
         self.cont_var_value = cont_var_value
-        self.__class__.solved_list.append(self)
+        self.parent_number = parent_number
+        self.make_node()
 
     def __repr__(self):
         return str(self.number)
@@ -36,6 +51,23 @@ class Solution(object):
             self.func_value = solution.func_value
             self.vars_value = solution.vars_value
             self.number = solution.number
+
+
+def create_Solved(problem, acc, parent_number=None):
+    problem_copy = problem.deepcopy()
+    problem_copy.solve()
+    acc += 1
+    # создаем объект решенной задачи
+    solved = Solved(problem=problem,
+                    status=problem_copy.status,
+                    number=acc,
+                    func_value=value(problem_copy.objective),
+                    vars_value=[var.varValue for var in problem_copy.variables()],
+                    parent_number=parent_number)
+    for v in problem_copy.variables():
+        if v.varValue != int(v.varValue):
+            solved.cont_var, solved.cont_var_value = v, v.varValue
+    return solved, acc
 
 
 def get_values(worksheet, row, column, expression=False):
@@ -98,13 +130,13 @@ def form_problem(alpha, beta, v, teta_integrated, V, **coeffs):
         constraint1 = [x[i] <= k[i] for i in range(0, n)]
         for cnstr in constraint1:
             problem += cnstr
-        constraint2 = [x[i] * v[i] <= teta_integrated[i] for i in range(0, n)]
+        constraint2 = [x[i] * v[i] <= min(teta_integrated[i], V[i]) for i in range(0, n)]
         for cnstr in constraint2:
             problem += cnstr
-        constraint3 = [teta_integrated[i] <= v[i] * (x[i] + 1) for i in range(0, n)]
+        constraint3 = [min(teta_integrated[i], V[i]) <= v[i] * (x[i] + 1) for i in range(0, n)]
         for cnstr in constraint3:
             problem += cnstr
-        problem.writeLP('formula1')
+        problem.writeLP('results/ZLP_formula1')
         return problem
 
     def form_problem_2(alpha, beta, v, teta_integrated, V, F, D, y):
@@ -128,7 +160,7 @@ def form_problem(alpha, beta, v, teta_integrated, V, **coeffs):
             problem += cnstr
         problem += sum_1yax <= sum_bx
 
-        problem.writeLP('formula2')
+        problem.writeLP('results/ZLP_formula2')
         return problem
 
     if coeffs['zadacha'] == 1:
@@ -137,30 +169,15 @@ def form_problem(alpha, beta, v, teta_integrated, V, **coeffs):
         return form_problem_2(alpha, beta, v, teta_integrated, V, coeffs['F'], coeffs['D'], coeffs['y'])
 
 
-def create_Solved(problem, acc):
-    problem_copy = problem.deepcopy()
-    problem_copy.solve()
-    acc += 1
-    # создаем объект решенной задачи
-    solved = Solved(problem=problem,
-                    status=problem_copy.status,
-                    number=acc,
-                    func_value=value(problem_copy.objective),
-                    vars_value=[var.varValue for var in problem_copy.variables()])
-    for v in problem_copy.variables():
-        if v.varValue != int(v.varValue):
-            solved.cont_var, solved.cont_var_value = v, v.varValue
-    return solved, acc
-
-
 def solve_problem(problem):
     # обнуляем дерево, потому что в одном прогоне программы может решаться несколько задач
-    Solved.solved_list = []
+    Solved.tree = []
     queue = []  # очередь на ветвление
     optimal = []  # лист оптимальных целочисленных решений
     acc = 0  # счетчик задач
     max_z = 0  # максимальное значение целевой функции
-    first, acc = create_Solved(problem, acc)
+
+    first, acc = create_Solved(problem, acc, parent_number=None)
     # возвращаем задачу, если она не оптимальна
     if first.status != 1:
         return Solution(status='Нерешаемо', acc=acc, solution=None)
@@ -183,7 +200,7 @@ def branch_and_bound(queue, max_z, acc, optimal):  # передаем сюда �
                 max_prob = prob
         queue.remove(max_prob)
         i = 1
-        queue, max_z, acc, optimal = create_branch(max_prob, acc, queue, max_z, optimal, i)
+        queue, max_z, acc, optimal = make_branch(max_prob, acc, queue, max_z, optimal, i)
         return branch_and_bound(queue, max_z, acc, optimal)
     else:
         if optimal:
@@ -191,18 +208,18 @@ def branch_and_bound(queue, max_z, acc, optimal):  # передаем сюда �
             for prob in optimal[1:]:
                 if prob.func_value > solution.func_value:
                     solution = prob
-            return Solution(acc=acc, status='Оптимально', solution=solution)  # возвращаем успешное решение в формате Solved
+            return Solution(acc=acc, status='Оптимально', solution=solution)
         else:
-            return Solution(status='Нерешаемо', acc=acc, solution=None)  # тут тоже должен быть солюшн
+            return Solution(status='Нерешаемо', acc=acc, solution=None)
 
 
-def create_branch(parent_problem, acc, queue, max_z, optimal, i):
+def make_branch(parent_problem, acc, queue, max_z, optimal, i):
     child_problem = parent_problem.problem.deepcopy()
     if i == 1:
         child_problem += parent_problem.cont_var <= floor(parent_problem.cont_var_value)  # левая ветвь
     elif i == 2:
         child_problem += parent_problem.cont_var >= ceil(parent_problem.cont_var_value)  # правая ветвь
-    child_solved, acc = create_Solved(child_problem, acc)
+    child_solved, acc = create_Solved(child_problem, acc, parent_number=parent_problem.number)
     if child_solved.status == 1:  # формируем подпроблему в очередь
         if child_solved.cont_var is None and max_z == 0:  # шаг 5
             max_z = child_solved.func_value
@@ -219,7 +236,7 @@ def create_branch(parent_problem, acc, queue, max_z, optimal, i):
             queue.append(child_solved)
 
     if i == 1:
-        return create_branch(parent_problem, acc, queue, max_z, optimal, i + 1)  # ветвим второй раз
+        return make_branch(parent_problem, acc, queue, max_z, optimal, i + 1)  # ветвим второй раз
     elif i == 2:
         return queue, max_z, acc, optimal
 
@@ -256,7 +273,7 @@ def show_results(sort_type, solved):
         sort_type = 'Сортировка: ' + sort_type
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
         results = [status, func_value, *xs, sort_type, acc, number_of_optimal]
-    print(Solved.solved_list)
+    DotExporter(Solved.tree[0], nodenamefunc=Solved.nodenamefunc).to_picture("results/ZLP_tree.png")
     return results
 
 
