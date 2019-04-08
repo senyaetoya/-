@@ -1,15 +1,25 @@
 # -*- coding: utf-8 -*-
 from anytree import Node, RenderTree
+from graphviz import render, Source
 from anytree.exporter import DotExporter
 from openpyxl import load_workbook
 from pulp import *
 from math import ceil, floor
+
+from pydot import Graph
 from sympy import Symbol, integrate
+import platform
+# чтобы прописать graphviz в PATH
+import os
+os.environ["PATH"] += os.pathsep + r'C:\Program Files (x86)\Graphviz2.38\bin'
 
 
 class Solved(object):
     # чтобы решить проблему с pyinstaller
-    solver = COIN_CMD(path=os.path.join(os.getcwd(), 'solver/cbc'))
+    if platform.system() == 'Windows':
+        solver = COIN_CMD(path=os.path.join(os.getcwd(), 'solver\\win\\cbc.exe'))
+    else:
+        solver = COIN_CMD(path=os.path.join(os.getcwd(), 'solver/linux/cbc'))
     tree = []
     statuses = ['Не решено', 'Оптимально', 'Неопределенно', 'Не ограниченно', 'Нерешаемо']
 
@@ -69,6 +79,7 @@ def create_Solved(problem, acc, parent_number=None):
     for v in problem_copy.variables():
         if v.varValue != int(v.varValue):
             solved.cont_var, solved.cont_var_value = v, v.varValue
+            break
     return solved, acc
 
 
@@ -275,7 +286,7 @@ def show_results(sort_type, solved):
         sort_type = 'Сортировка: ' + sort_type
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
         results = [status, func_value, *xs, sort_type, number_of_optimal, acc]
-    DotExporter(Solved.tree[0], nodenamefunc=Solved.nodenamefunc).to_picture("results/ZLP_tree.png")
+    DotExporter(Solved.tree[0], nodenamefunc=Solved.nodenamefunc).to_picture('results/zlp.png')
     return results
 
 
