@@ -15,7 +15,6 @@ def get_values(worksheet, row, column, string=False):
 
 
 def linear_programming():
-
     workbook = xlrd.open_workbook('Zadachka.xlsx')
     worksheet = workbook.sheet_by_index(0)
     alpha = get_values(worksheet, 4, 1)

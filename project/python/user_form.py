@@ -4,7 +4,7 @@
 #    Mar 19, 2019 02:27:57 PM MSK  platform: Linux
 import ctypes
 import sys
-import alexandra_support
+import user_form_support
 from int_linear_main import integer_lp
 from tkinter import ttk, filedialog
 import tkinter as tk
@@ -23,7 +23,7 @@ def vp_start_gui():
     sys.stdout.flush()
     root = tk.Tk()
     top = Toplevel1(root)
-    alexandra_support.init(root, top)
+    user_form_support.init(root, top)
     root.iconbitmap('img/icon.ico')
     root.mainloop()
 
@@ -40,7 +40,7 @@ def create_Toplevel1(root, *args, **kwargs):
     rt = root
     w = tk.Toplevel(root)
     top = Toplevel1(w)
-    alexandra_support.init(w, top, *args, **kwargs)
+    user_form_support.init(w, top, *args, **kwargs)
     return w, top
 
 
@@ -93,7 +93,26 @@ class Toplevel1:
 
         PNOTEBOOK = "ClosetabNotebook"
 
+        '''tk classes'''
+        class CoeffEntry(tk.Entry):
+            def __init__(self, master, var_type, *args, **kwargs):
+                tk.Entry.__init__(self, master, *args, **kwargs)
+                self.bind('<FocusOut>', focus_out)
+                self.var_type = var_type
+
         '''tk callbacks'''
+        def focus_out(e):
+            value = e.widget.get()
+            var_type = e.widget.var_type
+            try:
+                if var_type == 'int':
+                    int(value)
+                else:
+                    float(value)
+                e.widget['background'] = 'white'
+            except ValueError:
+                e.widget['background'] = '#FF6347'
+
         def open_file():
             file = filedialog.askopenfilename(filetypes=(('excel file', '*.xls'), ('excel file', '*.xlsx'),
                                                          ('excel file', '*.xlsm')))
@@ -103,21 +122,29 @@ class Toplevel1:
 
         def call_linear_prog(filepath, zadacha):
             if filepath == '':
+                raise Exception(
                 messagebox.showinfo('Ошибка', 'Вы не выбрали файл')
+                )
             else:
                 coeffs = {'sort': self.sort_var.get(),
                           'zadacha': zadacha}
                 if zadacha == 1:
-                    coeffs['T'] = int(self.T_entry_p1.get())
-                    coeffs['F'] = float(self.F_entry_p1.get())
+                    try:
+                        coeffs['T'] = int(self.T_entry_p1.get())
+                        coeffs['F'] = float(self.F_entry_p1.get())
+                    except ValueError:
+                        messagebox.showinfo('Ошибка', 'Неверное введены коэффициенты')
+                        raise
                 elif zadacha == 2:
-                    coeffs['T'] = int(self.T_entry_p2.get())
-                    coeffs['F'] = float(self.F_entry_p2.get())
-                    coeffs['D'] = float(self.D_entry_p2.get())
-                    coeffs['y'] = float(self.y_entry_p2.get())
-                for coeff, value in coeffs.items():
-                    if value == '':
-                        return messagebox.showinfo('Ошибка', 'Введены не все коэффициенты')
+                    try:
+                        coeffs['T'] = int(self.T_entry_p2.get())
+                        coeffs['F'] = float(self.F_entry_p2.get())
+                        coeffs['D'] = float(self.D_entry_p2.get())
+                        coeffs['y'] = float(self.y_entry_p2.get())
+                    except ValueError:
+                        messagebox.showinfo('Ошибка', 'Неверное введены коэффициенты')
+                        raise
+
                 results = integer_lp(filepath, **coeffs)
                 messagebox.showinfo('Решение', "\n".join(results))
 
@@ -137,7 +164,7 @@ class Toplevel1:
         F1.set(100000)
         F2.set(30000)
         T1.set(30)
-        T2.set(1)
+        T2.set(10)
         D.set(0.4 * F2.get())
         y.set(0.125)
 
@@ -170,19 +197,19 @@ class Toplevel1:
         self.formula1.configure(image=self._img_p1)
 
         self.Label_F = ttk.Label(self.PNotebook1_t0)
-        self.Label_F.place(relx=0.388, rely=0.51, height=30, width=42)
-        self.Label_F.configure(font="-family {DejaVu Sans} -size 16")
-        self.Label_F.configure(text='''F =''')
+        self.Label_F.place(relx=0.335, rely=0.52, height=30, width=150)
+        self.Label_F.configure(font="-family {DejaVu Sans} -size 14")
+        self.Label_F.configure(text='''F(float) =''')
 
-        self.F_entry_p1 = tk.Entry(self.PNotebook1_t0, textvariable=F1)
+        self.F_entry_p1 = CoeffEntry(self.PNotebook1_t0, var_type='float', textvariable=F1)
         self.F_entry_p1.place(relx=0.464, rely=0.51, height=43, relwidth=0.133)
 
         self.Label_T = ttk.Label(self.PNotebook1_t0)
-        self.Label_T.place(relx=0.388, rely=0.61, height=30, width=42)
-        self.Label_T.configure(font="-family {DejaVu Sans} -size 16")
-        self.Label_T.configure(text='''T =''')
+        self.Label_T.place(relx=0.36, rely=0.61, height=30, width=120)
+        self.Label_T.configure(font="-family {DejaVu Sans} -size 14")
+        self.Label_T.configure(text='''T(int) =''')
 
-        self.T_entry_p1 = tk.Entry(self.PNotebook1_t0, textvariable=T1)
+        self.T_entry_p1 = CoeffEntry(self.PNotebook1_t0, var_type='int', textvariable=T1)
         self.T_entry_p1.place(relx=0.464, rely=0.60, height=43, relwidth=0.133)
 
         self.Label1 = tk.Label(self.PNotebook1_t0)
@@ -237,39 +264,39 @@ class Toplevel1:
         self.formula_p2.configure(image=self._img_p2)
 
         self.Label_F_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_F_p2.place(relx=0.388, rely=0.52, height=20, width=42)
+        self.Label_F_p2.place(relx=0.32, rely=0.52, height=20, width=120)
         self.Label_F_p2.configure(background="white")
-        self.Label_F_p2.configure(font="-family {DejaVu Sans} -size 16")
-        self.Label_F_p2.configure(text='''F =''')
+        self.Label_F_p2.configure(font="-family {DejaVu Sans} -size 14")
+        self.Label_F_p2.configure(text='''F(float) =''')
 
-        self.F_entry_p2 = tk.Entry(self.PNotebook1_t1, textvariable=F2)
+        self.F_entry_p2 = CoeffEntry(self.PNotebook1_t1, var_type='float', textvariable=F2)
         self.F_entry_p2.place(relx=0.464, rely=0.51, height=33, relwidth=0.133)
 
         self.Label_T_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_T_p2.place(relx=0.388, rely=0.59, height=20, width=42)
+        self.Label_T_p2.place(relx=0.33, rely=0.59, height=20, width=120)
         self.Label_T_p2.configure(background="white")
-        self.Label_T_p2.configure(font="-family {DejaVu Sans} -size 16")
-        self.Label_T_p2.configure(text='''T =''')
+        self.Label_T_p2.configure(font="-family {DejaVu Sans} -size 14")
+        self.Label_T_p2.configure(text='''T(int) =''')
 
-        self.T_entry_p2 = tk.Entry(self.PNotebook1_t1, textvariable=T2)
+        self.T_entry_p2 = CoeffEntry(self.PNotebook1_t1, var_type='int', textvariable=T2)
         self.T_entry_p2.place(relx=0.464, rely=0.58, height=33, relwidth=0.133)
 
         self.Label_D_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_D_p2.place(relx=0.388, rely=0.66, height=20, width=42)
+        self.Label_D_p2.place(relx=0.315, rely=0.66, height=20, width=120)
         self.Label_D_p2.configure(background="white")
-        self.Label_D_p2.configure(font="-family {DejaVu Sans} -size 16")
-        self.Label_D_p2.configure(text='''D =''')
+        self.Label_D_p2.configure(font="-family {DejaVu Sans} -size 14")
+        self.Label_D_p2.configure(text='''D(float) =''')
 
-        self.D_entry_p2 = tk.Entry(self.PNotebook1_t1, textvariable=D)
+        self.D_entry_p2 = CoeffEntry(self.PNotebook1_t1, var_type='float', textvariable=D)
         self.D_entry_p2.place(relx=0.464, rely=0.65, height=33, relwidth=0.133)
 
         self.Label_y_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_y_p2.place(relx=0.388, rely=0.72, height=30, width=42)
+        self.Label_y_p2.place(relx=0.32, rely=0.72, height=30, width=120)
         self.Label_y_p2.configure(background="white")
-        self.Label_y_p2.configure(font="-family {DejaVu Sans} -size 16")
-        self.Label_y_p2.configure(text='''y =''')
+        self.Label_y_p2.configure(font="-family {DejaVu Sans} -size 14")
+        self.Label_y_p2.configure(text='''y(float) =''')
 
-        self.y_entry_p2 = tk.Entry(self.PNotebook1_t1, textvariable=y)
+        self.y_entry_p2 = CoeffEntry(self.PNotebook1_t1, var_type='float', textvariable=y)
         self.y_entry_p2.place(relx=0.464, rely=0.72, height=33, relwidth=0.133)
 
         self.Label_sort_p2 = tk.Label(self.PNotebook1_t1)

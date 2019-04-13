@@ -27,5 +27,5 @@ def destroy_window():
 
 
 if __name__ == '__main__':
-    import alexandra
-    alexandra.vp_start_gui()
+    import user_form
+    user_form.vp_start_gui()
