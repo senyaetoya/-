@@ -91,7 +91,7 @@ def create_Solved(problem, acc, parent_number=None):
     return solved, acc
 
 
-def get_values(worksheet, row, column, column_len=-1, is_expression=False, is_int=False):
+def get_values(worksheet, row, column, column_len=-1, is_expression=False):
     values = []
     allowed = expr_allowed_symbols
     while worksheet.cell(row, column).value is not None:
@@ -100,7 +100,7 @@ def get_values(worksheet, row, column, column_len=-1, is_expression=False, is_in
         if is_expression and set(str(cell_value)) <= allowed and not set(str(cell_value)) <= symbols:
             values.append(str(cell_value))
             row += 1
-        elif is_int and type(cell_value) is int or type(cell_value) is float:
+        elif (type(cell_value) is float) or (type(cell_value) is int):
             values.append(cell_value)
             row += 1
         else:
@@ -124,8 +124,8 @@ def get_data_excel(filepath, T):
     #  получаем массивы данных с листа по столбцам
     alpha = get_values(worksheet, 2, 2)
     beta = get_values(worksheet, 2, 3, len(alpha))
-    v = get_values(worksheet, 2, 4, len(alpha), is_int=True)
-    V = get_values(worksheet, 2, 5, len(alpha), is_int=True)
+    v = get_values(worksheet, 2, 4, len(alpha))
+    V = get_values(worksheet, 2, 5, len(alpha))
     teta = get_values(worksheet, 2, 6, len(alpha), is_expression=True)
     # интегрируем тета
     x = Symbol('x')
