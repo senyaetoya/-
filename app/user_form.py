@@ -4,8 +4,8 @@
 #    Mar 19, 2019 02:27:57 PM MSK  platform: Linux
 import ctypes
 import sys
-import user_form_support
-from int_linear_main import integer_lp
+import app.user_form_support
+from app.int_linear_main import integer_lp
 from tkinter import ttk, filedialog
 import tkinter as tk
 from tkinter import messagebox
@@ -23,7 +23,7 @@ def vp_start_gui():
     sys.stdout.flush()
     root = tk.Tk()
     top = Toplevel1(root)
-    user_form_support.init(root, top)
+    app.user_form_support.init(root, top)
     root.iconbitmap('img/icon.ico')
     root.mainloop()
 
@@ -40,7 +40,7 @@ def create_Toplevel1(root, *args, **kwargs):
     rt = root
     w = tk.Toplevel(root)
     top = Toplevel1(w)
-    user_form_support.init(w, top, *args, **kwargs)
+    app.user_form_support.init(w, top, *args, **kwargs)
     return w, top
 
 

@@ -27,5 +27,5 @@ def destroy_window():
 
 
 if __name__ == '__main__':
-    import user_form
-    user_form.vp_start_gui()
+    import app.user_form
+    app.user_form.vp_start_gui()
