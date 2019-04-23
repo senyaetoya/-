@@ -10,6 +10,7 @@ from tkinter.filedialog import asksaveasfilename
 from PIL import Image, ImageTk as itk
 from docx import Document
 from docx.shared import Inches, Cm
+from numpy import linspace
 
 import app.user_form_support
 from app.int_linear_main import integer_lp
@@ -65,7 +66,7 @@ class Toplevel1:
         _fgcolor = 'black'  #
         _compcolor = 'white'  #
         _ana1color = 'white'  #
-        _ana2color = '#ddd'  # light-gray
+        _ana2color = 'white'  # light-gray
 
         self.style = ttk.Style()
         self.style.configure('.', background=_bgcolor)
@@ -153,14 +154,18 @@ class Toplevel1:
                     try:
                         coeffs['T'] = int(self.T_entry_p2.get())
                         coeffs['F'] = float(self.F_entry_p2.get())
-                        coeffs['D'] = float(self.D_entry_p2.get())
                         coeffs['y'] = float(self.y_entry_p2.get())
+                        if self.auto_D.get() == 1:
+                            Ds = [k * coeffs['F'] for k in linspace(0.1, 1.5, 15)]
+                            coeffs['auto_D'] = Ds
+                        else:
+                            coeffs['D'] = float(self.D_entry_p2.get())
                     except ValueError:
                         messagebox.showinfo('Ошибка', 'Неверное введены коэффициенты')
                         raise
                 results, initial_problem = integer_lp(filepath, **coeffs)
                 answer = messagebox.askyesno('Решение', "\n".join(results) +
-                                             '\n\nХотите сохранить результат в файл?')
+                                             '\n\nХотите сохранить результат в DOCX файл?')
                 if answer:
                     file_name = asksaveasfilename(defaultextension=".docx",
                                                   initialdir=(prog_location + "/results"),
@@ -170,20 +175,28 @@ class Toplevel1:
                         # создаем кортеж values of OrderedDict, преобразуем в лист и индексируем
                         obj = str(list(initial_problem.constraints.values())[0])
                         constrs = map(str, list(initial_problem.constraints.values())[1:])
-                        paragraph = 'Максимизируем целевую функцию:\n' + str(obj) + \
-                                    '\n\nС ограничениями:\n' + '\n'.join(constrs) + '\n\nДерево решений задачи:'
-                        document.add_paragraph(paragraph)
-                        document.add_picture('results/zlp.png', width=Cm(10))
+                        document.add_paragraph('Максимизируем целевую функцию:\n' +
+                                               str(obj) + '\n\nС ограничениями:\n' +
+                                               '\n'.join(constrs))
+                        document.add_paragraph("\n".join(results))
+                        document.add_paragraph('Дерево решений задачи:')
+                        document.add_picture('results/temp_tree.png', width=Cm(10))
                         document.save(file_name)
                         messagebox.showinfo('Файл создан', 'Файл с результатом был успешно сохранен!')
 
+        def block_D_entry():
+            if self.auto_D.get():
+                self.D_entry_p2.configure(state='disabled')
+            else:
+                self.D_entry_p2.configure(state='normal')
+
         '''tk variables'''
-        self.sort_var = tk.StringVar()
-        self.sort_var.set('b/a')
         #  кнопки открытия файла и запуска расчетов
         filename = tk.StringVar()
         filepath = tk.StringVar()
-        #  коэффициенты в entry
+        #  коэффициенты в форме
+        self.sort_var = tk.StringVar()
+        self.sort_var.set('b/a')
         F1 = tk.DoubleVar()
         F2 = tk.DoubleVar()
         T1 = tk.IntVar()
@@ -196,6 +209,9 @@ class Toplevel1:
         T2.set(10)
         D.set(0.4 * F2.get())
         y.set(0.125)
+        self.auto_D = tk.BooleanVar()
+        self.auto_D.set(0)
+
         self.customFont = tkFont.Font(family="Cambria", size=12, weight='bold')
         default_font = tkFont.nametofont("TkDefaultFont")
         default_font.configure(size=12)
@@ -319,7 +335,12 @@ class Toplevel1:
         self.Label_D_p2.configure(text='Заимствованные средства (D)')
 
         self.D_entry_p2 = CoeffEntry(self.PNotebook1_t1, var_type='float', textvariable=D)
-        self.D_entry_p2.place(relx=0.2, rely=0.58, height=43, relwidth=0.133, anchor='center')
+        self.D_entry_p2.place(relx=0.12, rely=0.58, height=43, relwidth=0.133, anchor='center')
+
+        self.D_auto_checkbutton = ttk.Checkbutton(self.PNotebook1_t1, variable=self.auto_D,
+                                                  text='Автоподбор D', onvalue=1, offvalue=0,
+                                                  command=block_D_entry)
+        self.D_auto_checkbutton.place(relx=0.21, rely=0.58, anchor='w')
 
         self.Label_y_p2 = ttk.Label(self.PNotebook1_t1)
         self.Label_y_p2.place(relx=0.2, rely=0.64, anchor='center')

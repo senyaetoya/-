@@ -60,9 +60,10 @@ class Solved(object):
 
 
 class Solution(object):
-    def __init__(self, acc, solution=None):
+    def __init__(self, acc, solution=None, auto_coeff_D=False):
         self.acc = acc
         self.has_sol = False
+        self.coeff_D = auto_coeff_D
         if solution is not None:
             for x in solution.vars_value:
                 if x != 0:
@@ -271,30 +272,13 @@ def make_branch(parent_problem, acc, queue, max_z, optimal, i):
         return queue, max_z, acc, optimal
 
 
-def write_to_excel(workbook, worksheet, filepath, sort_type, problem):
-    for row in worksheet['H2:H9']:
-        for cell in row:
-            cell.value = None
-    if not problem.has_sol:
-        worksheet.cell(2, 8).value = 'Статус: Нерешаемо'
-        worksheet.cell(3, 8).value = 'Количество решенных ЗЛП: ' + str(problem.acc)
-    else:
-        worksheet.cell(2, 8).value = 'Статус: Оптимально'
-        worksheet.cell(3, 8).value = 'Сортировка: ' + sort_type
-        worksheet.cell(4, 8).value = 'Значение целевой функции: ' + str(problem.func_value)
-        worksheet.cell(5, 8).value = 'Количество решенных ЗЛП: ' + str(problem.acc)
-        worksheet.cell(6, 8).value = 'Номер оптимальной задачи: ' + str(problem.number)
-        for i in range(len(problem.variables)):
-            worksheet.cell(6 + i, 8).value = (str(problem.variables[i]) +
-                                              " = " + str(problem.vars_value[i]))
-    workbook.save(filepath)
-
-
 def show_results(sort_type, solved):
     if not solved.has_sol:
         status = 'Статус: Нерешаемо'
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
         results = [status, acc]
+        if solved.coeff_D:
+            results.append('Подобранный D:' + str(solved.coeff_D))
     else:
         status = 'Статус: Оптимально'
         xs = [str(x[0]) + ' = ' + str(x[1]) for x in zip(solved.variables, solved.vars_value)]
@@ -303,17 +287,50 @@ def show_results(sort_type, solved):
         sort_type = 'Сортировка: ' + sort_type
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
         results = [status, func_value, *xs, sort_type, number_of_optimal, acc]
-    DotExporter(Solved.tree[0], nodenamefunc=Solved.nodenamefunc).to_picture('results/zlp.png')
+        if solved.coeff_D:
+            results.append('Подобранный D: ' + str(solved.coeff_D))
+    DotExporter(Solved.tree[0], nodenamefunc=Solved.nodenamefunc).to_picture('results/temp_tree.png')
     return results
+
+
+def write_to_excel(workbook, worksheet, filepath, results):
+    for row in worksheet['j2:j10']:
+        for cell in row:
+            cell.value = None
+    for i in range(2, len(results)):
+        worksheet.cell(i, 10).value = results[i-2]
+    try:
+        workbook.save(filepath)
+    except PermissionError:
+        messagebox.showinfo('Ошибка', 'Нет доступа к указанному файлу Excel.\n'
+                                      'Возможно, Вы не закрыли этот файл.\n'
+                                      'Результат записан не будет.')
 
 
 def integer_lp(filepath, **coeffs):
     data, workbook, worksheet = get_data_excel(filepath, coeffs['T'])
     sorted_data = sort_data(coeffs['sort'], *data)
-    problem = form_problem(*sorted_data, **coeffs)
-    solved_problem = solve_problem(problem)
-    write_to_excel(workbook, worksheet, filepath, coeffs['sort'], solved_problem)
-    results = show_results(coeffs['sort'], solved_problem)
+    # если автоподбор параметра D
+    if 'auto_D' in coeffs:
+        # решаем проблему с первым значением D и убираем его из списка
+        coeffs['D'] = coeffs['auto_D'].pop(0)
+        problem = form_problem(*sorted_data, **coeffs)
+        solution_problem = solve_problem(problem)
+        solution_problem.coeff_D = coeffs['D']
+        if not solution_problem.has_sol:
+            solution_problem.func_value = 0
+        for d in coeffs['auto_D']:
+            coeffs['D'] = d
+            problem = form_problem(*sorted_data, **coeffs)
+            solved_problem = solve_problem(problem)
+            if solved_problem.has_sol and solved_problem.func_value > solution_problem.func_value:
+                solution_problem = solved_problem
+                solution_problem.coeff_D = d
+    else:
+        problem = form_problem(*sorted_data, **coeffs)
+        solution_problem = solve_problem(problem)
+    results = show_results(coeffs['sort'], solution_problem)
+    write_to_excel(workbook, worksheet, filepath, results)
     return results, problem
 
 
