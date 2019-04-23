@@ -30,13 +30,14 @@ class Solved(object):
     statuses = ['Не решено', 'Оптимально', 'Неопределенно', 'Не ограниченно', 'Нерешаемо']
 
     def nodenamefunc(node):
-        node_params = [str(node.name), node.status, *node.xs]
+        node_params = [str(node.name), node.status, str(node.func_value), *node.xs]
         return "\n".join(node_params)
 
     def make_node(self):
         status = Solved.statuses[self.status]
         xs = [str(x[0]) + ' = ' + str(x[1]) for x in zip(self.problem.variables(), self.vars_value)]
-        new_node = Node(name=self.number, status=status, xs=xs, parent_name=self.parent_number)
+        new_node = Node(name=self.number, status=status, xs=xs,
+                        func_value=self.func_value, parent_name=self.parent_number)
         for node in self.tree:
             if node.name == new_node.parent_name:
                 new_node.parent = node
@@ -159,9 +160,7 @@ def form_problem(alpha, beta, v, teta_integrated, V, **coeffs):
         x = LpVariable.dicts('x', range(n), lowBound=0, cat=LpContinuous)
         sum_var1 = lpSum([x[i] * v[i] * beta[i] for i in range(0, n)])
         sum_var2 = lpSum([x[i] * v[i] * alpha[i] for i in range(0, n)])
-
         problem += sum_var1 - sum_var2  # 'Функция цели "11.1"'
-
         problem += sum_var2 <= F  # "11.2"
         constraint1 = [x[i] <= k[i] for i in range(0, n)]
         for cnstr in constraint1:
@@ -172,7 +171,6 @@ def form_problem(alpha, beta, v, teta_integrated, V, **coeffs):
         constraint3 = [min(teta_integrated[i], V[i]) <= v[i] * (x[i] + 1) for i in range(0, n)]
         for cnstr in constraint3:
             problem += cnstr
-        problem.writeLP('results/ZLP_formula1')
         return problem
 
     def form_problem_2(alpha, beta, v, teta_integrated, V, F, D, y):
@@ -185,9 +183,7 @@ def form_problem(alpha, beta, v, teta_integrated, V, **coeffs):
         sum_xva = lpSum([x[i] * v[i] * alpha[i] for i in range(0, n)])
         sum_1yax = lpSum([(1 + y) * alpha[i] * x[i] for i in range(0, n)])
         sum_bx = lpSum([beta[i] * x[i] for i in range(0, n)])
-
         problem += sum_xvb + ((1 + y) * (F - sum_xva))  # цель
-
         problem += sum_xva <= F + D
         constraint1 = [x[i] <= k[i] for i in range(0, n)]
         constraint2 = [x[i] * v[i] <= min(teta_integrated[i], V[i]) for i in range(0, n)]
@@ -195,8 +191,6 @@ def form_problem(alpha, beta, v, teta_integrated, V, **coeffs):
         for cnstr in [*constraint1, *constraint2, *constraint3]:
             problem += cnstr
         problem += sum_1yax <= sum_bx
-
-        problem.writeLP('results/ZLP_formula2')
         return problem
 
     if coeffs['zadacha'] == 1:
@@ -319,7 +313,8 @@ def integer_lp(filepath, **coeffs):
     problem = form_problem(*sorted_data, **coeffs)
     solved_problem = solve_problem(problem)
     write_to_excel(workbook, worksheet, filepath, coeffs['sort'], solved_problem)
-    return show_results(coeffs['sort'], solved_problem)
+    results = show_results(coeffs['sort'], solved_problem)
+    return results, problem
 
 
 def main():

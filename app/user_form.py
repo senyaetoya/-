@@ -4,6 +4,13 @@
 #    Mar 19, 2019 02:27:57 PM MSK  platform: Linux
 import ctypes
 import sys
+import tkinter.font as tkFont
+from tkinter.filedialog import asksaveasfilename
+
+from PIL import Image, ImageTk as itk
+from docx import Document
+from docx.shared import Inches, Cm
+
 import app.user_form_support
 from app.int_linear_main import integer_lp
 from tkinter import ttk, filedialog
@@ -66,10 +73,16 @@ class Toplevel1:
         self.style.configure('.', font="TkDefaultFont")
         self.style.map('.', background=
         [('selected', _compcolor), ('active', _ana2color)])
-
-        top.geometry("800x652+611+181")
+        # Gets the requested values of the height and widht.
+        window_width = 1000
+        window_height = 800
+        # Gets both half the screen width/height and window width/height
+        position_right = int(root.winfo_screenwidth() / 2 - window_width / 2)
+        position_down = int(root.winfo_screenheight() / 2 - window_height / 2)
+        # Positions the window in the center of the page.
+        top.geometry("{}x{}+{}+{}".format(window_width, window_height, position_right, position_down))
         top.resizable(width=False, height=False)
-        top.title("Задачи линейного программирования")
+        top.title("Поиск оптимального портфеля закупок")
         top.configure(highlightcolor="black")
 
         self.style.layout("ClosetabNotebook", [("ClosetabNotebook.client",
@@ -114,7 +127,8 @@ class Toplevel1:
                 e.widget['background'] = '#FF6347'
 
         def open_file():
-            file = filedialog.askopenfilename(filetypes=(('excel file', '*.xls'), ('excel file', '*.xlsx'),
+            file = filedialog.askopenfilename(initialdir=(prog_location + "/excel"),
+                                              filetypes=(('excel file', '*.xls'), ('excel file', '*.xlsx'),
                                                          ('excel file', '*.xlsm')))
             if file is not None:
                 filename.set(file.rpartition('/')[2])
@@ -123,7 +137,7 @@ class Toplevel1:
         def call_linear_prog(filepath, zadacha):
             if filepath == '':
                 raise Exception(
-                messagebox.showinfo('Ошибка', 'Вы не выбрали файл')
+                messagebox.showinfo('Ошибка', 'Вы не загрузили таблицу исходных данных')
                 )
             else:
                 coeffs = {'sort': self.sort_var.get(),
@@ -144,9 +158,24 @@ class Toplevel1:
                     except ValueError:
                         messagebox.showinfo('Ошибка', 'Неверное введены коэффициенты')
                         raise
-
-                results = integer_lp(filepath, **coeffs)
-                messagebox.showinfo('Решение', "\n".join(results))
+                results, initial_problem = integer_lp(filepath, **coeffs)
+                answer = messagebox.askyesno('Решение', "\n".join(results) +
+                                             '\n\nХотите сохранить результат в файл?')
+                if answer:
+                    file_name = asksaveasfilename(defaultextension=".docx",
+                                                  initialdir=(prog_location + "/results"),
+                                                  filetypes=[('Word Document (.docx)', '.docx')])
+                    if file_name:
+                        document = Document()
+                        # создаем кортеж values of OrderedDict, преобразуем в лист и индексируем
+                        obj = str(list(initial_problem.constraints.values())[0])
+                        constrs = map(str, list(initial_problem.constraints.values())[1:])
+                        paragraph = 'Максимизируем целевую функцию:\n' + str(obj) + \
+                                    '\n\nС ограничениями:\n' + '\n'.join(constrs) + '\n\nДерево решений задачи:'
+                        document.add_paragraph(paragraph)
+                        document.add_picture('results/zlp.png', width=Cm(10))
+                        document.save(file_name)
+                        messagebox.showinfo('Файл создан', 'Файл с результатом был успешно сохранен!')
 
         '''tk variables'''
         self.sort_var = tk.StringVar()
@@ -167,175 +196,157 @@ class Toplevel1:
         T2.set(10)
         D.set(0.4 * F2.get())
         y.set(0.125)
+        self.customFont = tkFont.Font(family="Cambria", size=12, weight='bold')
+        default_font = tkFont.nametofont("TkDefaultFont")
+        default_font.configure(size=12)
 
+        '''window elements'''
         self.style.configure('TNotebook.Tab', background=_bgcolor)
         self.style.configure('TNotebook.Tab', foreground=_fgcolor)
         self.style.map('TNotebook.Tab', background=
         [('selected', _compcolor), ('active', _ana2color)])
         self.PNotebook1 = ttk.Notebook(top)
         self.PNotebook1.place(relx=0.0, rely=0.0, relheight=1.0, relwidth=1.0)
-        self.PNotebook1.configure(width=300)
         self.PNotebook1.configure(style=PNOTEBOOK)
 
-        self.PNotebook1_t0 = tk.Frame(self.PNotebook1, takefocus='1', background='white')
-        self.PNotebook1.add(self.PNotebook1_t0, padding=3)
-        self.PNotebook1.tab(0, text="Задача 1")
+        self.PNotebook1_t0 = tk.Frame(takefocus='1', background='white')
+        self.PNotebook1.add(self.PNotebook1_t0)
+        self.PNotebook1.tab(0, text=" Базовая стратегия ")
 
-        self.PNotebook1_t1 = tk.Frame(self.PNotebook1, takefocus='1', background='white')
-        self.PNotebook1.add(self.PNotebook1_t1, padding=3)
-        self.PNotebook1.tab(1, text="Задача 2")
+        self.PNotebook1_t1 = tk.Frame(takefocus='1', background='white')
+        self.PNotebook1.add(self.PNotebook1_t1)
+        self.PNotebook1.tab(1, text=" Кредитная стратегия ")
 
-        '''1 page'''
-        self.formula1 = ttk.Label(self.PNotebook1_t0)
-        self.formula1.place(relx=0.039, rely=0.02, height=239, width=720)
-        self.formula1.configure(background="white")
-        self.formula1.configure(foreground="#000000")
-        self.formula1.configure(font="TkDefaultFont")
-        self.formula1.configure(relief='flat')
-        photo_location = os.path.join(prog_location, "./img/1.png")
-        self._img_p1 = tk.PhotoImage(file=photo_location)
-        self.formula1.configure(image=self._img_p1)
+        '''1 PAGE'''
+        self.formula_p1 = ttk.Label(self.PNotebook1_t0)
+        image = Image.open(os.path.join(prog_location, "./img/1.png"))
+        factor = 0.5
+        width, height = map(lambda x: int(x * factor), image.size)
+        image_sized = image.resize((width, height), Image.ANTIALIAS)
+        self.image1 = itk.PhotoImage(image_sized)
+        self.formula_p1.configure(image=self.image1)
+        self.formula_p1.place(anchor='center', relx=0.7, rely=0.3)
+
+        self.label_file_p1 = ttk.Label(self.PNotebook1_t0)
+        self.label_file_p1.place(relx=0.05, rely=0.06, anchor='w')
+        self.label_file_p1.configure(text='1) Загрузите таблицу\nисходных данных:',
+                                     font=self.customFont)
+
+        self.file_button_p1 = tk.Button(self.PNotebook1_t0, command=open_file)
+        self.file_button_p1.place(relx=0.2, rely=0.15, anchor='center', height=50, width=240)
+        self.file_button_p1.configure(background="#ffffff", cursor='hand2')
+        self.file_button_p1.configure(relief='sunken', textvariable=filename)
+
+        self.label_coeffs_p1 = ttk.Label(self.PNotebook1_t0)
+        self.label_coeffs_p1.place(relx=0.05, rely=0.23, anchor='w')
+        self.label_coeffs_p1.configure(text='2) Введите исходные данные:', font=self.customFont)
 
         self.Label_F = ttk.Label(self.PNotebook1_t0)
-        self.Label_F.place(relx=0.335, rely=0.52, height=30, width=150)
-        self.Label_F.configure(font="-family {DejaVu Sans} -size 14")
-        self.Label_F.configure(text='''F(float) =''')
+        self.Label_F.place(relx=0.2, rely=0.28, anchor='center')
+        self.Label_F.configure(text='Свободные средства (F)')
 
         self.F_entry_p1 = CoeffEntry(self.PNotebook1_t0, var_type='float', textvariable=F1)
-        self.F_entry_p1.place(relx=0.464, rely=0.51, height=43, relwidth=0.133)
+        self.F_entry_p1.place(relx=0.2, rely=0.34, anchor='center', height=43, relwidth=0.133)
 
         self.Label_T = ttk.Label(self.PNotebook1_t0)
-        self.Label_T.place(relx=0.36, rely=0.61, height=30, width=120)
-        self.Label_T.configure(font="-family {DejaVu Sans} -size 14")
-        self.Label_T.configure(text='''T(int) =''')
+        self.Label_T.place(relx=0.2, rely=0.4, anchor='center')
+        self.Label_T.configure(text='Время в целых днях (T)')
 
         self.T_entry_p1 = CoeffEntry(self.PNotebook1_t0, var_type='int', textvariable=T1)
-        self.T_entry_p1.place(relx=0.464, rely=0.60, height=43, relwidth=0.133)
+        self.T_entry_p1.place(relx=0.2, rely=0.46, anchor='center', height=43, relwidth=0.133)
 
-        self.Label1 = tk.Label(self.PNotebook1_t0)
-        self.Label1.place(relx=0.05, rely=0.45, height=21, width=180)
-        self.Label1.configure(activebackground="#f9f9f9")
-        self.Label1.configure(text='''Выберите сортировку:''')
+        self.label_sort_p1 = ttk.Label(self.PNotebook1_t0)
+        self.label_sort_p1.place(relx=0.05, rely=0.55, anchor='w')
+        self.label_sort_p1.configure(text='3) Выберите стратегию поиска \nначального приближения:', font=self.customFont)
 
         self.radio_sort_ba_p1 = tk.Radiobutton(self.PNotebook1_t0)
-        self.radio_sort_ba_p1.place(relx=0.05, rely=0.52, relheight=0.037
-                                    , relwidth=0.182)
+        self.radio_sort_ba_p1.place(relx=0.05, rely=0.62, anchor='w')
         self.radio_sort_ba_p1.configure(justify='left')
         self.radio_sort_ba_p1.configure(text='β/α (max -> min)', background='white')
         self.radio_sort_ba_p1.configure(variable=self.sort_var, value='b/a')
 
         self.radio_sort_teta_p1 = tk.Radiobutton(self.PNotebook1_t0)
-        self.radio_sort_teta_p1.place(relx=0.05, rely=0.58, relheight=0.037
-                                      , relwidth=0.252)
+        self.radio_sort_teta_p1.place(relx=0.05, rely=0.68, anchor='w')
         self.radio_sort_teta_p1.configure(justify='left', background='white')
         self.radio_sort_teta_p1.configure(text='интеграл θ (max -> min)')
         self.radio_sort_teta_p1.configure(variable=self.sort_var, value='teta')
 
-        self.Label2 = tk.Label(self.PNotebook1_t0)
-        self.Label2.place(relx=0.375, rely=0.45, height=21, width=195)
-        self.Label2.configure(activebackground="#f9f9f9")
-        self.Label2.configure(text='''Введите коэффициенты:''')
-
-        self.Label3 = tk.Label(self.PNotebook1_t0)
-        self.Label3.place(relx=0.705, rely=0.45, height=21, width=185)
-        self.Label3.configure(text='''Выберите файл excel:''')
-
-        self.file_button_p1 = tk.Button(self.PNotebook1_t0, command=open_file)
-        self.file_button_p1.place(relx=0.702, rely=0.52, height=41, width=191)
-        self.file_button_p1.configure(width=191)
-        self.file_button_p1.configure(background="#ffffff", cursor='hand2', )
-        self.file_button_p1.configure(relief='sunken', textvariable=filename)
-
         self.exe_button_p1 = ttk.Button(self.PNotebook1_t0)
         self.exe_button_p1.configure(command=lambda: call_linear_prog(filepath.get(), zadacha=1))
-        self.exe_button_p1.place(relx=0.330, rely=0.80, height=70, width=250)
+        self.exe_button_p1.place(relx=0.68, rely=0.7, anchor='center', height=80, width=300)
         self.exe_button_p1.configure(text='''Рассчитать''')
 
-        '''вторая задача'''
-
+        '''2 PAGE'''
         self.formula_p2 = ttk.Label(self.PNotebook1_t1)
-        self.formula_p2.place(relx=0.1, rely=0.02, height=239, width=720)
-        self.formula_p2.configure(background="white")
-        self.formula_p2.configure(foreground="#000000")
-        self.formula_p2.configure(font="TkDefaultFont")
-        self.formula_p2.configure(relief='flat')
-        photo_location2 = os.path.join(prog_location, "./img/2.png")
-        self._img_p2 = tk.PhotoImage(file=photo_location2)
-        self.formula_p2.configure(image=self._img_p2)
+        image = Image.open(os.path.join(prog_location, "./img/2.png"))
+        factor = 0.5
+        width, height = map(lambda x: int(x * factor), image.size)
+        image_sized = image.resize((width, height), Image.ANTIALIAS)
+        self.image2 = itk.PhotoImage(image_sized)
+        self.formula_p2.configure(image=self.image2)
+        self.formula_p2.place(anchor='center', relx=0.7, rely=0.3)
 
-        self.Label_F_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_F_p2.place(relx=0.32, rely=0.52, height=20, width=120)
-        self.Label_F_p2.configure(background="white")
-        self.Label_F_p2.configure(font="-family {DejaVu Sans} -size 14")
-        self.Label_F_p2.configure(text='''F(float) =''')
+        self.label_file_p2 = ttk.Label(self.PNotebook1_t1)
+        self.label_file_p2.place(relx=0.05, rely=0.06, anchor='w')
+        self.label_file_p2.configure(text='1) Загрузите таблицу\nисходных данных:',
+                                     font=self.customFont)
+
+        self.file_button_p2 = tk.Button(self.PNotebook1_t1, command=open_file)
+        self.file_button_p2.place(relx=0.2, rely=0.15, anchor='center', height=50, width=240)
+        self.file_button_p2.configure(background="#ffffff", cursor='hand2')
+        self.file_button_p2.configure(relief='sunken', textvariable=filename)
+
+        self.label_coeffs_p2 = ttk.Label(self.PNotebook1_t1)
+        self.label_coeffs_p2.place(relx=0.05, rely=0.23, anchor='w')
+        self.label_coeffs_p2.configure(text='2) Введите исходные данные:', font=self.customFont)
+
+        self.Label_F = ttk.Label(self.PNotebook1_t1)
+        self.Label_F.place(relx=0.2, rely=0.28, anchor='center')
+        self.Label_F.configure(text='Свободные средства (F)')
 
         self.F_entry_p2 = CoeffEntry(self.PNotebook1_t1, var_type='float', textvariable=F2)
-        self.F_entry_p2.place(relx=0.464, rely=0.51, height=33, relwidth=0.133)
+        self.F_entry_p2.place(relx=0.2, rely=0.34, anchor='center', height=43, relwidth=0.133)
 
-        self.Label_T_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_T_p2.place(relx=0.33, rely=0.59, height=20, width=120)
-        self.Label_T_p2.configure(background="white")
-        self.Label_T_p2.configure(font="-family {DejaVu Sans} -size 14")
-        self.Label_T_p2.configure(text='''T(int) =''')
+        self.Label_T = ttk.Label(self.PNotebook1_t1)
+        self.Label_T.place(relx=0.2, rely=0.4, anchor='center')
+        self.Label_T.configure(text='Время в целых днях (T)')
 
         self.T_entry_p2 = CoeffEntry(self.PNotebook1_t1, var_type='int', textvariable=T2)
-        self.T_entry_p2.place(relx=0.464, rely=0.58, height=33, relwidth=0.133)
+        self.T_entry_p2.place(relx=0.2, rely=0.46, anchor='center', height=43, relwidth=0.133)
 
-        self.Label_D_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_D_p2.place(relx=0.315, rely=0.66, height=20, width=120)
-        self.Label_D_p2.configure(background="white")
-        self.Label_D_p2.configure(font="-family {DejaVu Sans} -size 14")
-        self.Label_D_p2.configure(text='''D(float) =''')
+        self.Label_D_p2 = ttk.Label(self.PNotebook1_t1)
+        self.Label_D_p2.place(relx=0.2, rely=0.52, anchor='center')
+        self.Label_D_p2.configure(text='Заимствованные средства (D)')
 
         self.D_entry_p2 = CoeffEntry(self.PNotebook1_t1, var_type='float', textvariable=D)
-        self.D_entry_p2.place(relx=0.464, rely=0.65, height=33, relwidth=0.133)
+        self.D_entry_p2.place(relx=0.2, rely=0.58, height=43, relwidth=0.133, anchor='center')
 
-        self.Label_y_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_y_p2.place(relx=0.32, rely=0.72, height=30, width=120)
-        self.Label_y_p2.configure(background="white")
-        self.Label_y_p2.configure(font="-family {DejaVu Sans} -size 14")
-        self.Label_y_p2.configure(text='''y(float) =''')
+        self.Label_y_p2 = ttk.Label(self.PNotebook1_t1)
+        self.Label_y_p2.place(relx=0.2, rely=0.64, anchor='center')
+        self.Label_y_p2.configure(text='Ставка по кредиту (y)')
 
         self.y_entry_p2 = CoeffEntry(self.PNotebook1_t1, var_type='float', textvariable=y)
-        self.y_entry_p2.place(relx=0.464, rely=0.72, height=33, relwidth=0.133)
+        self.y_entry_p2.place(relx=0.2, rely=0.7, height=43, relwidth=0.133, anchor='center')
 
-        self.Label_sort_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_sort_p2.place(relx=0.05, rely=0.45, height=21, width=180)
-        self.Label_sort_p2.configure(activebackground="#f9f9f9")
-        self.Label_sort_p2.configure(text='''Выберите сортировку:''')
+        self.label_sort_p2 = ttk.Label(self.PNotebook1_t1)
+        self.label_sort_p2.place(relx=0.05, rely=0.79, anchor='w')
+        self.label_sort_p2.configure(text='3) Выберите стратегию поиска \nначального приближения:', font=self.customFont)
 
         self.radio_sort_ba_p2 = tk.Radiobutton(self.PNotebook1_t1)
-        self.radio_sort_ba_p2.place(relx=0.05, rely=0.52, relheight=0.037
-                                    , relwidth=0.182)
+        self.radio_sort_ba_p2.place(relx=0.05, rely=0.86, anchor='w')
         self.radio_sort_ba_p2.configure(justify='left')
         self.radio_sort_ba_p2.configure(text='β/α (max -> min)', background='white')
         self.radio_sort_ba_p2.configure(variable=self.sort_var, value='b/a')
 
         self.radio_sort_teta_p2 = tk.Radiobutton(self.PNotebook1_t1)
-        self.radio_sort_teta_p2.place(relx=0.05, rely=0.58, relheight=0.037
-                                      , relwidth=0.252)
+        self.radio_sort_teta_p2.place(relx=0.05, rely=0.92, anchor='w')
         self.radio_sort_teta_p2.configure(justify='left', background='white')
         self.radio_sort_teta_p2.configure(text='интеграл θ (max -> min)')
         self.radio_sort_teta_p2.configure(variable=self.sort_var, value='teta')
 
-        self.Label_coef_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_coef_p2.place(relx=0.375, rely=0.45, height=21, width=195)
-        self.Label_coef_p2.configure(activebackground="#f9f9f9")
-        self.Label_coef_p2.configure(text='''Введите коэффициенты:''')
-
-        self.Label_file_p2 = tk.Label(self.PNotebook1_t1)
-        self.Label_file_p2.place(relx=0.705, rely=0.45, height=21, width=185)
-        self.Label_file_p2.configure(text='''Выберите файл excel:''')
-
-        self.file_button_p2 = tk.Button(self.PNotebook1_t1, command=open_file)
-        self.file_button_p2.place(relx=0.702, rely=0.52, height=41, width=191)
-        self.file_button_p2.configure(width=191)
-        self.file_button_p2.configure(background="#ffffff")
-        self.file_button_p2.configure(relief='sunken', textvariable=filename)
-
         self.exe_button_p2 = ttk.Button(self.PNotebook1_t1)
         self.exe_button_p2.configure(command=lambda: call_linear_prog(filepath.get(), zadacha=2))
-        self.exe_button_p2.place(relx=0.330, rely=0.80, height=70, width=250)
+        self.exe_button_p2.place(relx=0.68, rely=0.7, anchor='center', height=80, width=300)
         self.exe_button_p2.configure(text='''Рассчитать''')
 
 
