@@ -235,7 +235,7 @@ class Toplevel1:
 
         '''1 PAGE'''
         self.formula_p1 = ttk.Label(self.PNotebook1_t0)
-        image = Image.open(os.path.join(prog_location, "./img/1.png"))
+        image = Image.open('img/1.png')
         factor = 0.5
         width, height = map(lambda x: int(x * factor), image.size)
         image_sized = image.resize((width, height), Image.ANTIALIAS)
@@ -294,7 +294,7 @@ class Toplevel1:
 
         '''2 PAGE'''
         self.formula_p2 = ttk.Label(self.PNotebook1_t1)
-        image = Image.open(os.path.join(prog_location, "./img/2.png"))
+        image = Image.open('img/2.png')
         factor = 0.5
         width, height = map(lambda x: int(x * factor), image.size)
         image_sized = image.resize((width, height), Image.ANTIALIAS)

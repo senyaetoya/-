@@ -278,7 +278,7 @@ def show_results(sort_type, solved):
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
         results = [status, acc]
         if solved.coeff_D:
-            results.append('Подобранный D:' + str(solved.coeff_D))
+            results.append('Подобранный D: ' + str(solved.coeff_D))
     else:
         status = 'Статус: Оптимально'
         xs = [str(x[0]) + ' = ' + str(x[1]) for x in zip(solved.variables, solved.vars_value)]
@@ -291,6 +291,10 @@ def show_results(sort_type, solved):
             results.append('Подобранный D: ' + str(solved.coeff_D))
     DotExporter(Solved.tree[0], nodenamefunc=Solved.nodenamefunc).to_picture('results/temp_tree.png')
     return results
+
+
+def make_plot(solved):
+    pass
 
 
 def write_to_excel(workbook, worksheet, filepath, results):
