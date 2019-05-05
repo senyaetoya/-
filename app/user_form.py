@@ -6,14 +6,12 @@ import ctypes
 import sys
 import tkinter.font as tkFont
 from tkinter.filedialog import asksaveasfilename
-
 from PIL import Image, ImageTk as itk
 from docx import Document
 from docx.shared import Inches, Cm
 from numpy import linspace
-
 import app.user_form_support
-from app.int_linear_main import integer_lp
+from app.int_linear_main import integer_lp, write_to_docx
 from tkinter import ttk, filedialog
 import tkinter as tk
 from tkinter import messagebox
@@ -147,6 +145,7 @@ class Toplevel1:
                     try:
                         coeffs['T'] = int(self.T_entry_p1.get())
                         coeffs['F'] = float(self.F_entry_p1.get())
+                        coeffs['stable'] = self.sol_stability.get()
                     except ValueError:
                         messagebox.showinfo('Ошибка', 'Неверное введены коэффициенты')
                         raise
@@ -163,26 +162,7 @@ class Toplevel1:
                     except ValueError:
                         messagebox.showinfo('Ошибка', 'Неверное введены коэффициенты')
                         raise
-                results, initial_problem = integer_lp(filepath, **coeffs)
-                answer = messagebox.askyesno('Решение', "\n".join(results) +
-                                             '\n\nХотите сохранить результат в DOCX файл?')
-                if answer:
-                    file_name = asksaveasfilename(defaultextension=".docx",
-                                                  initialdir=(prog_location + "/results"),
-                                                  filetypes=[('Word Document (.docx)', '.docx')])
-                    if file_name:
-                        document = Document()
-                        # создаем кортеж values of OrderedDict, преобразуем в лист и индексируем
-                        obj = str(list(initial_problem.constraints.values())[0])
-                        constrs = map(str, list(initial_problem.constraints.values())[1:])
-                        document.add_paragraph('Максимизируем целевую функцию:\n' +
-                                               str(obj) + '\n\nС ограничениями:\n' +
-                                               '\n'.join(constrs))
-                        document.add_paragraph("\n".join(results))
-                        document.add_paragraph('Дерево решений задачи:')
-                        document.add_picture('results/temp_tree.png', width=Cm(10))
-                        document.save(file_name)
-                        messagebox.showinfo('Файл создан', 'Файл с результатом был успешно сохранен!')
+                integer_lp(filepath, **coeffs)
 
         def block_D_entry():
             if self.auto_D.get():
@@ -211,6 +191,8 @@ class Toplevel1:
         y.set(0.125)
         self.auto_D = tk.BooleanVar()
         self.auto_D.set(0)
+        self.sol_stability = tk.BooleanVar()
+        self.sol_stability.set(1)
 
         self.customFont = tkFont.Font(family="Cambria", size=12, weight='bold')
         default_font = tkFont.nametofont("TkDefaultFont")
@@ -291,6 +273,11 @@ class Toplevel1:
         self.exe_button_p1.configure(command=lambda: call_linear_prog(filepath.get(), zadacha=1))
         self.exe_button_p1.place(relx=0.68, rely=0.7, anchor='center', height=80, width=300)
         self.exe_button_p1.configure(text='''Рассчитать''')
+
+        self.check_sol_stability = ttk.Checkbutton(self.PNotebook1_t0)
+        self.check_sol_stability.place(relx=0.68, rely=0.6, anchor='center')
+        self.check_sol_stability.configure(text='Рассчитать стабильность решения',
+                                           var=self.sol_stability)
 
         '''2 PAGE'''
         self.formula_p2 = ttk.Label(self.PNotebook1_t1)
