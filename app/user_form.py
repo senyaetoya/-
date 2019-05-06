@@ -5,13 +5,10 @@
 import ctypes
 import sys
 import tkinter.font as tkFont
-from tkinter.filedialog import asksaveasfilename
 from PIL import Image, ImageTk as itk
-from docx import Document
-from docx.shared import Inches, Cm
 from numpy import linspace
 import app.user_form_support
-from app.int_linear_main import integer_lp, write_to_docx
+from app.int_linear_main import integer_lp
 from tkinter import ttk, filedialog
 import tkinter as tk
 from tkinter import messagebox
@@ -260,13 +257,13 @@ class Toplevel1:
         self.radio_sort_ba_p1 = tk.Radiobutton(self.PNotebook1_t0)
         self.radio_sort_ba_p1.place(relx=0.05, rely=0.62, anchor='w')
         self.radio_sort_ba_p1.configure(justify='left')
-        self.radio_sort_ba_p1.configure(text='β/α (max -> min)', background='white')
+        self.radio_sort_ba_p1.configure(text='По наибольшей марже', background='white')
         self.radio_sort_ba_p1.configure(variable=self.sort_var, value='b/a')
 
         self.radio_sort_teta_p1 = tk.Radiobutton(self.PNotebook1_t0)
         self.radio_sort_teta_p1.place(relx=0.05, rely=0.68, anchor='w')
         self.radio_sort_teta_p1.configure(justify='left', background='white')
-        self.radio_sort_teta_p1.configure(text='интеграл θ (max -> min)')
+        self.radio_sort_teta_p1.configure(text='По оборачиваемости запасов')
         self.radio_sort_teta_p1.configure(variable=self.sort_var, value='teta')
 
         self.exe_button_p1 = ttk.Button(self.PNotebook1_t0)
@@ -343,13 +340,13 @@ class Toplevel1:
         self.radio_sort_ba_p2 = tk.Radiobutton(self.PNotebook1_t1)
         self.radio_sort_ba_p2.place(relx=0.05, rely=0.86, anchor='w')
         self.radio_sort_ba_p2.configure(justify='left')
-        self.radio_sort_ba_p2.configure(text='β/α (max -> min)', background='white')
+        self.radio_sort_ba_p2.configure(text='По наибольшей марже', background='white')
         self.radio_sort_ba_p2.configure(variable=self.sort_var, value='b/a')
 
         self.radio_sort_teta_p2 = tk.Radiobutton(self.PNotebook1_t1)
         self.radio_sort_teta_p2.place(relx=0.05, rely=0.92, anchor='w')
         self.radio_sort_teta_p2.configure(justify='left', background='white')
-        self.radio_sort_teta_p2.configure(text='интеграл θ (max -> min)')
+        self.radio_sort_teta_p2.configure(text='По оборачиваемости запасов')
         self.radio_sort_teta_p2.configure(variable=self.sort_var, value='teta')
 
         self.exe_button_p2 = ttk.Button(self.PNotebook1_t1)

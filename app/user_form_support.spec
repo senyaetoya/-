@@ -1,4 +1,5 @@
 # -*- mode: python -*-
+# -*- coding: utf-8 -*-
 import sys
 from os import path, getcwd
 
@@ -26,10 +27,10 @@ exe = EXE(pyz,
           a.zipfiles,
           a.datas,
           [],
-          name='user_form_support',
+          name='ZLP',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
           runtime_tmpdir=None,
-          console=True , icon='img\\icon.ico')
+          console=True, icon='img\\icon.ico')

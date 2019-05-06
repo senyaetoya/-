@@ -101,13 +101,16 @@ def create_Solved(problem, acc, parent_number=None):
     return solved, acc
 
 
-def get_values(worksheet, row, column, column_len=-1, is_expression=False):
+def get_values(worksheet, row, column, column_len=-1, is_expression=False, is_name=False):
     values = []
     allowed = expr_allowed_symbols
     while worksheet.cell(row, column).value is not None:
         #  если это выражение, все его символы разрешены и оно состоит не из одних лишь операторов
         cell_value = worksheet.cell(row, column).value
-        if is_expression and set(str(cell_value)) <= allowed and not set(str(cell_value)) <= symbols:
+        if is_name:
+            values.append(str(cell_value))
+            row += 1
+        elif is_expression and set(str(cell_value)) <= allowed and not set(str(cell_value)) <= symbols:
             values.append(str(cell_value))
             row += 1
         elif (type(cell_value) is float) or (type(cell_value) is int):
@@ -132,11 +135,14 @@ def get_data_excel(filepath, T):
     workbook = load_workbook(filename=str(filepath))
     worksheet = workbook.worksheets[0]
     #  получаем массивы данных с листа по столбцам
+    name = get_values(worksheet, 2, 1, is_name=True)
     alpha = get_values(worksheet, 2, 2)
     beta = get_values(worksheet, 2, 3, len(alpha))
     v = get_values(worksheet, 2, 4, len(alpha))
     V = get_values(worksheet, 2, 5, len(alpha))
     teta = get_values(worksheet, 2, 6, len(alpha), is_expression=True)
+    # добавляем первоначальный порядок
+    order = [i for i in range(0, len(alpha))]
     # интегрируем тета
     x = Symbol('x')
     try:
@@ -144,11 +150,13 @@ def get_data_excel(filepath, T):
     except Exception:
         messagebox.showinfo('Ошибка', 'Не все функции по тета интегрируются')
         raise
-    data = {'alpha': alpha,
+    data = {'name': name,
+            'alpha': alpha,
             'beta': beta,
             'v': v,
             'teta_integrated': teta_integrated,
-            'V': V}
+            'V': V,
+            'order': order}
     return data, workbook, worksheet
 
 
@@ -156,14 +164,16 @@ def sort_data(sort_type, data):
     if sort_type == 'b/a':
         ba = [b / a for a, b in zip(data['alpha'], data['beta'])]
         zipped = list(zip(ba, data['teta_integrated'], data['alpha'],
-                          data['beta'], data['V'], data['v']))
+                          data['beta'], data['V'], data['v'], data['order']))
         zipped.sort(reverse=True)
-        ba, data['teta_integrated'], data['alpha'], data['beta'], data['V'], data['v'] = zip(*zipped)
+        ba, data['teta_integrated'], data['alpha'], data['beta'], \
+            data['V'], data['v'], data['order'] = zip(*zipped)
     elif sort_type == 'teta':
         zipped = list(zip(data['teta_integrated'], data['alpha'],
-                          data['beta'], data['V'], data['v']))
+                          data['beta'], data['V'], data['v'], data['order']))
         zipped.sort(reverse=True)
-        data['teta_integrated'], data['alpha'], data['beta'], data['V'], data['v'] = zip(*zipped)
+        data['teta_integrated'], data['alpha'], data['beta'], \
+            data['V'], data['v'], data['order'] = zip(*zipped)
     return data
 
 
@@ -176,7 +186,7 @@ def form_problem(data, **coeffs):
         x = LpVariable.dicts('x', range(n), lowBound=0, cat=LpContinuous)
         sum_var1 = lpSum([x[i] * v[i] * beta[i] for i in range(0, n)])
         sum_var2 = lpSum([x[i] * v[i] * alpha[i] for i in range(0, n)])
-        problem += sum_var1 - sum_var2  # 'Функция цели "11.1"'
+        problem += sum_var1 + (F - sum_var2)  # 'Функция цели "11.1"'
         problem += sum_var2 <= F  # "11.2"
         constraint1 = [x[i] <= k[i] for i in range(0, n)]
         for cnstr in constraint1:
@@ -292,7 +302,7 @@ def make_branch(parent_problem, acc, queue, max_z, optimal, i):
         return queue, max_z, acc, optimal
 
 
-def solution_stability(solution, data):
+def solution_stability(solution, data, coeffs):
 
     def minimum_e(optimal_list, e_min_problem, e_min_prob_index, es):
         """
@@ -326,13 +336,14 @@ def solution_stability(solution, data):
         else:
             return es
 
-    def make_stability_plot(es, data):
+    def make_stability_plot(es, data, coeffs):
         # нужно построить функцию от неизвестного e, имея две точки: значение функции при e = 0
         # и при e, пересекающем оптимальную функцию. По сути, нужно только посчитать
         # значение целевой функции в этой точке и построить графики. Нужно использовать
         # проблемы l+1
         alpha = data['alpha']
         v = data['v']
+        F = coeffs['F']
         n = len(alpha)
 
         x_opt = es[0].vars_value
@@ -341,7 +352,7 @@ def solution_stability(solution, data):
         sum_var1 = sum([x_opt[i] * v[i] * beta[i] for i in range(0, n)])
         sum_var2 = sum([x_opt[i] * v[i] * alpha[i] for i in range(0, n)])
         opt_zero_f_val = es[0].func_value
-        opt_one_f_val = sum_var1 - sum_var2
+        opt_one_f_val = sum_var1 + F - sum_var2
         fig, ax = plt.subplots(nrows=1, ncols=1)
         ax.plot([0, 1], [opt_zero_f_val, opt_one_f_val], label='Оптимальная задача: ' + str(opt_number))
         del es[0]
@@ -353,7 +364,7 @@ def solution_stability(solution, data):
                 beta = [b * (1 + e) for b in data['beta']]
                 sum_var1 = sum([x[i] * v[i] * beta[i] for i in range(0, n)])
                 sum_var2 = sum([x[i] * v[i] * alpha[i] for i in range(0, n)])
-                intersection_f_list.append(sum_var1 - sum_var2)
+                intersection_f_list.append(sum_var1 + F - sum_var2)
             for zero_f, cross_f, e, problem in zip(zero_f_list, intersection_f_list, es, es.values()):
                 ax.plot([0, e, 2*e], [zero_f, cross_f, cross_f*2],
                         label='Целочисленная задача: ' + str(problem.number))
@@ -369,18 +380,20 @@ def solution_stability(solution, data):
         return plot_path, es
 
     optimal_list = solution.optimal_problems
-    optimal_list.append(Solved(problem=solution.optimal_problems[0].problem,
-                               number='a', func_value=100, vars_value=[10, 9, 13],
-                               status=1))
-    optimal_list.append(Solved(problem=solution.optimal_problems[0].problem,
-                               number='b', func_value=100, vars_value=[7, 10, 10],
-                               status=1))
-    optimal_list.append(Solved(problem=solution.optimal_problems[0].problem,
-                               number='c', func_value=200, vars_value=[10, 10, 7],
-                               status=1))
-    optimal_list.append(Solved(problem=solution.optimal_problems[0].problem,
-                               number='d', func_value=300, vars_value=[9, 7, 11],
-                               status=1))
+    # optimal_list.append(Solved(problem=solution.optimal_problems[0].problem,
+    #                            number='a', func_value=100, vars_value=[10, 12, 13, 18, 18],
+    #                            status=1))
+    # optimal_list.append(Solved(problem=solution.optimal_problems[0].problem,
+    #                            number='b', func_value=100, vars_value=[10, 10, 18, 18, 18],
+    #                            status=1))
+    # optimal_list.append(Solved(problem=solution.optimal_problems[0].problem,
+    #                            number='c', func_value=200, vars_value=[10, 10, 18, 20, 18],
+    #                            status=1))
+    # optimal_list.append(Solved(problem=solution.optimal_problems[0].problem,
+    #                            number='d', func_value=300, vars_value=[10, 18, 11, 20, 19],
+    #                            status=1))
+    # k_list = {problem.number: sum(problem.vars_value[i] * data['beta'][i]
+    #         for i in range(0, len(data['beta']))) for problem in optimal_list}
     optimal_list.sort(key=lambda problem: sum(problem.vars_value[i] * data['beta'][i]
                                               for i in range(0, len(data['beta']))))
 
@@ -388,11 +401,12 @@ def solution_stability(solution, data):
     index_list = [x.number for x in optimal_list]
     sol_index = index_list.index(sol_num) if sol_num in index_list else None
     es = {0: solution}
-    es = minimum_e(optimal_list, solution, sol_index, es)
-    return make_stability_plot(es, data)
+    if len(optimal_list) > 1:
+        es = minimum_e(optimal_list, solution, sol_index, es)
+    return make_stability_plot(es, data, coeffs)
 
 
-def show_results(sort_type, solved):
+def show_results(sort_type, solved, sorted_data):
     if not solved.has_sol:
         status = 'Статус: Нерешаемо'
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
@@ -400,13 +414,19 @@ def show_results(sort_type, solved):
         if solved.coeff_D:
             results.append('Подобранный D: ' + str(solved.coeff_D))
     else:
+        xs_order = sorted_data['order']
         status = 'Статус: Оптимально'
-        xs = [str(x[0]) + ' = ' + str(x[1]) for x in zip(solved.variables, solved.vars_value)]
+        sorted_xs = [0 for i in range(0, len(xs_order))]
+        for i in range(0, len(xs_order)):
+            sorted_xs[xs_order[i]] = solved.vars_value[i]
+        partys = 'Количество партий товаров:'
+        xs = [x[0] + ' = ' + str(x[1])
+              for x in zip(sorted_data['name'], sorted_xs)]
         number_of_optimal = 'Номер оптимальной задачи: ' + str(solved.number)
         func_value = 'Значение целевой функции: ' + str(solved.func_value)
         sort_type = 'Сортировка: ' + sort_type
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
-        results = [status, func_value, *xs, sort_type, number_of_optimal, acc]
+        results = [status, func_value, partys, *xs, sort_type, number_of_optimal, acc]
         if solved.coeff_D:
             results.append('Подобранный D: ' + str(solved.coeff_D))
     tree_img_path = 'results/temp_tree.png'
@@ -415,11 +435,11 @@ def show_results(sort_type, solved):
 
 
 def write_to_excel(workbook, worksheet, filepath, results):
-    for row in worksheet['j2:j10']:
+    for row in worksheet['i2:i50']:
         for cell in row:
             cell.value = None
     for i in range(2, len(results)):
-        worksheet.cell(i, 10).value = results[i-2]
+        worksheet.cell(i, 9).value = results[i-2]
     try:
         workbook.save(filepath)
     except PermissionError:
@@ -442,11 +462,11 @@ def write_to_docx(problem, results, plot_img_path, tree_img_path, is_stable, es)
                                '\n'.join(constrs))
         document.add_paragraph("\n".join(results))
         document.add_heading('Дерево решений задачи:', 1)
-        document.add_picture(tree_img_path, width=Cm(10))
+        document.add_picture(tree_img_path, width=Cm(12))
         if is_stable:
             document.add_heading('Устойчивость решения:', 1)
             if plot_img_path is not None:
-                document.add_picture(plot_img_path, width=Cm(10))
+                document.add_picture(plot_img_path, width=Cm(14))
                 document.add_paragraph('Интервалы сохранения значения оптимального портфеля закупок:\n' +
                                        '[0, ' + ''.join(str(e) + ', ' for e in es) + '∞)')
             else:
@@ -484,17 +504,17 @@ def integer_lp(filepath, **coeffs):
     if 'stable' in coeffs and coeffs['stable']:
         is_stable = True
         if solution_problem.has_sol:
-            plot_img_path, es = solution_stability(solution_problem, sorted_data)
-    results, tree_img_path = show_results(coeffs['sort'], solution_problem)
+            plot_img_path, es = solution_stability(solution_problem, sorted_data, coeffs)
+    results, tree_img_path = show_results(coeffs['sort'], solution_problem, sorted_data)
     write_to_excel(workbook, worksheet, filepath, results)
     try:
         answer = messagebox.askyesno('Решение', "\n".join(results) +
                                      '\n\nХотите сохранить подробный результат\nв DOCX файл?')
+        if answer:
+            write_to_docx(problem, results, plot_img_path, tree_img_path, is_stable, es)
     except PermissionError:
         messagebox.showinfo('Ошибка', 'Доступ к выбранному файлу невозможен. Может быть,'
                                       'Вы пытаетесь переписать открытый файл')
-    if answer:
-        write_to_docx(problem, results, plot_img_path, tree_img_path, is_stable, es)
     # удаляю временные файлы, которые закидываются в doc с результатами, графика может не быть
     os.remove(tree_img_path)
     try:
@@ -504,7 +524,7 @@ def integer_lp(filepath, **coeffs):
 
 
 def main():
-    print(integer_lp('excel/Zadachka2.xlsx', T=1, F=30000, zadacha=1, sort='b/a', stable=1))
+    print(integer_lp('excel/Zadachka.xlsx', T=1, F=30000, zadacha=1, sort='b/a', stable=1))
 
 
 if __name__ == '__main__':
