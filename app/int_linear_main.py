@@ -48,7 +48,7 @@ class Solved(object):
     else:
         solver = COIN_CMD(path=os.path.join(os.getcwd(), 'solver/linux/cbc'))
     tree = []
-    statuses = ['Не решено', 'Целое', 'Неопределенно', 'Не ограниченно', 'Нецелое']
+    statuses = ['Не решено', 'Целое', 'Неопределенно', 'Не ограниченно', 'Нерешаемое']
 
     def nodenamefunc(node):
         node_params = [str(node.name), node.status, str(node.func_value), *node.xs]
@@ -68,9 +68,10 @@ class Solved(object):
 
 
 class Solution(object):
-    def __init__(self, acc, solution=None, optimal_problems=[], auto_coeff_D=False):
+    def __init__(self, acc, tree, solution=None, optimal_problems=[], auto_coeff_D=False):
         self.acc = acc
         self.coeff_D = auto_coeff_D
+        self.tree = tree
         self.has_sol = False
         if solution is not None:
             for x in solution.vars_value:
@@ -247,7 +248,7 @@ def solve_problem(problem):
     first, acc = create_Solved(problem, acc, parent_number=None)
     # возвращаем задачу, если она не оптимальна
     if first.status != 1:
-        return Solution(acc=acc, solution=None)
+        return Solution(acc=acc, solution=None, tree=Solved.tree.copy())
     else:
         # проверяем проблему на целочисленность
         if first.cont_var is not None:
@@ -256,7 +257,7 @@ def solve_problem(problem):
             return branch_and_bound(queue, max_z, acc, optimal)
         # если проблема целочислена на первом шаге
         else:
-            return Solution(acc=acc, solution=first, optimal_problems=[first])
+            return Solution(acc=acc, solution=first, optimal_problems=[first], tree=Solved.tree.copy())
 
 
 def branch_and_bound(queue, max_z, acc, optimal):  # передаем сюда задачу на ветвление, в том числе нецелую переменную
@@ -275,9 +276,9 @@ def branch_and_bound(queue, max_z, acc, optimal):  # передаем сюда �
             for prob in optimal[1:]:
                 if prob.func_value > solution.func_value:
                     solution = prob
-            return Solution(acc=acc, solution=solution, optimal_problems=optimal)
+            return Solution(acc=acc, solution=solution, optimal_problems=optimal, tree=Solved.tree.copy())
         else:
-            return Solution(acc=acc, solution=None)
+            return Solution(acc=acc, solution=None, tree=Solved.tree.copy())
 
 
 def make_branch(parent_problem, acc, queue, max_z, optimal, i):
@@ -312,7 +313,7 @@ def make_branch(parent_problem, acc, queue, max_z, optimal, i):
 
 def solution_stability(solution, data, coeffs):
 
-    def minimum_e(optimal_list, e_min_problem, e_min_prob_index, es):
+    def minimum_e_no_credit(optimal_list, e_min_problem, e_min_prob_index, es, data):
         """
         Эта функция находит интервалы значений инфляции (е), в рамках которых
         оптимальный портфель закупок сохраняется. Первый шаг расчета начинается с
@@ -340,7 +341,34 @@ def solution_stability(solution, data, coeffs):
                 e_min_prob_index = i
         if l != n - 1 and e_min != float('inf'):
             es[e_min] = e_min_problem
-            return minimum_e(optimal_list, e_min_problem, e_min_prob_index, es)
+            return minimum_e_no_credit(optimal_list, e_min_problem, e_min_prob_index, es)
+        else:
+            return es
+
+    def minimum_e_credit(optimal_list, e_min_problem, e_min_prob_index, es, data):
+        e_min = float('inf')
+        x_l = e_min_problem.vars_value
+        l = e_min_prob_index
+        n = len(optimal_list)
+        for i in range(l + 1, n):
+            x = optimal_list[i].vars_value
+            e = (
+                    (
+                            sum(x_l[i] * (data['beta'][i] - (1 + data['y']) * data['alpha'][i]) for i in range(0, len(x))) -
+                            sum(x[i] * (data['beta'][i] - (1 + data['y']) * data['alpha'][i]) for i in range(0, len(x)))
+                    ) /
+                    (
+                            sum(x[i] * data['beta'][i] for i in range(0, len(x))) -
+                            sum(x_l[i] * data['beta'][i] for i in range(0, len(x)))
+                    )
+            )
+            if 0 < e < e_min:
+                e_min = e
+                e_min_problem = optimal_list[i]
+                e_min_prob_index = i
+        if l != n - 1 and e_min != float('inf'):
+            es[e_min] = e_min_problem
+            return minimum_e_no_credit(optimal_list, e_min_problem, e_min_prob_index, es)
         else:
             return es
 
@@ -409,17 +437,17 @@ def solution_stability(solution, data, coeffs):
                                    status=1))
     k_list = {problem.number: sum(problem.vars_value[i] * data['beta'][i]
             for i in range(0, len(data['beta']))) for problem in optimal_list}
-    if coeffs['zadacha'] == 1:
-        optimal_list.sort(key=lambda problem: sum(problem.vars_value[i] * data['beta'][i]
-                                                  for i in range(0, len(data['beta']))))
-    elif coeffs['zadacha'] == 2:
-        pass
+    optimal_list.sort(key=lambda problem: sum(problem.vars_value[i] * data['beta'][i]
+                                              for i in range(0, len(data['beta']))))
     sol_num = solution.number
     index_list = [x.number for x in optimal_list]
     sol_index = index_list.index(sol_num) if sol_num in index_list else None
     es = {0: solution}
     if len(optimal_list) > 1:
-        es = minimum_e(optimal_list, solution, sol_index, es)
+        if coeffs['zadacha'] == 1:
+            es = minimum_e_no_credit(optimal_list, solution, sol_index, es, data)
+        elif coeffs['zadacha'] == 2:
+            es = minimum_e_credit(optimal_list, solution, sol_index, es, data)
     return make_stability_plot(es, data, coeffs)
 
 
@@ -444,17 +472,18 @@ def show_results(sort_type, solved, sorted_data, coeffs):
         xs = [x[0] + ' = ' + str(x[1]) + ' по ' + str(x[2]) + ' штук'
               for x in zip(sorted_data['name'], unsorted_xs, sorted_data['unsorted_v'])]
         number_of_optimal = 'Номер оптимальной задачи: ' + str(solved.number)
-        func_value = 'Чистая прибыль: ' + str(solved.func_value - coeffs['F'])
+        revenue = 'Выручка: ' + str(solved.func_value)
+        profit = 'Чистая прибыль: ' + str(solved.func_value - coeffs['F'])
         sort_type = 'Сортировка: ' + sort_type
         acc = 'Кол-во решенных ЗЛП: ' + str(solved.acc)
-        results = [status, func_value, partys, *xs, sort_type, number_of_optimal, acc]
+        results = [status, revenue, profit, partys, *xs, sort_type, number_of_optimal, acc]
         if solved.coeff_D:
             results.append('Подобранный D: ' + str(solved.coeff_D))
         elif 'D' in coeffs:
             results.append('D: ' + str(coeffs['D']))
     tree_img_path = results_dir + '/temp_tree.png'
 
-    DotExporter(Solved.tree[0], nodenamefunc=Solved.nodenamefunc).to_picture(tree_img_path)
+    DotExporter(solved.tree[0], nodenamefunc=Solved.nodenamefunc).to_picture(tree_img_path)
     return results, tree_img_path, unsorted_xs
 
 
